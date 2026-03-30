@@ -1,0 +1,226 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Effect System — JAPL</title><meta name="description" content="Deep dive into JAPL's effect rows, effect tracking, handlers, and the algebra of computational effects."><!-- Open Graph --><meta property="og:type" content="website"><meta property="og:title" content="Effect System — JAPL"><meta property="og:description" content="Deep dive into JAPL's effect rows, effect tracking, handlers, and the algebra of computational effects."><meta property="og:url" content="https://japl-lang.dev/docs/guide/03-effects/"><meta property="og:image" content="https://japl-lang.dev/og-image.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:site_name" content="JAPL"><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Effect System — JAPL"><meta name="twitter:description" content="Deep dive into JAPL's effect rows, effect tracking, handlers, and the algebra of computational effects."><meta name="twitter:image" content="https://japl-lang.dev/og-image.png"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="canonical" href="https://japl-lang.dev/docs/guide/03-effects/"><link rel="stylesheet" href="/_astro/_slug_.CrD4dbaS.css">
+<style>.docs-wrapper{display:grid;grid-template-columns:260px 1fr;min-height:100vh;gap:0}.docs-sidebar{position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);padding:24px 0}.docs-sidebar-logo{padding:0 24px 24px;border-bottom:1px solid var(--border);margin-bottom:16px}.docs-sidebar-logo a{font-weight:800;font-size:1.25rem;color:var(--text)}.docs-sidebar-logo span{color:var(--accent)}.sidebar-section{padding:8px 0}.sidebar-section-title{padding:8px 24px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}.sidebar-link{display:block;padding:6px 24px 6px 32px;font-size:.875rem;color:var(--text-dim);transition:color .15s,background .15s;border-left:2px solid transparent}.sidebar-link:hover{color:var(--text);background:var(--accent-dim)}.sidebar-link.active{color:var(--accent);border-left-color:var(--accent);background:var(--accent-dim)}.docs-content{max-width:780px;padding:48px 56px}.breadcrumbs{display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--muted);margin-bottom:32px}.breadcrumbs a{color:var(--muted)}.breadcrumbs a:hover{color:var(--accent)}.breadcrumbs .separator{color:var(--border)}.doc-header{margin-bottom:40px}.doc-header h1{font-size:2rem;margin-bottom:8px}.doc-header .description{color:var(--text-dim);font-size:1.05rem}.status-badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-left:12px;vertical-align:middle}.status-badge.stable{background:#22c55e26;color:#22c55e}.status-badge.draft{background:#f9731626;color:#f97316}.status-badge.planned{background:#64748b26;color:#94a3b8}.prev-next{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:64px;padding-top:32px;border-top:1px solid var(--border)}.prev-next-link{display:flex;flex-direction:column;padding:16px 20px;border:1px solid var(--border);border-radius:var(--radius);transition:border-color .2s,background .2s}.prev-next-link:hover{border-color:var(--accent);background:var(--accent-dim)}.prev-next-link.next{text-align:right;align-items:flex-end}.prev-next-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px}.prev-next-title{font-weight:600;color:var(--text)}.edit-link{display:inline-flex;align-items:center;gap:6px;margin-top:40px;font-size:.8rem;color:var(--muted)}.edit-link:hover{color:var(--accent)}@media (max-width: 900px){.docs-wrapper{grid-template-columns:1fr}.docs-sidebar{position:fixed;left:-280px;width:280px;z-index:100;transition:left .3s ease}.docs-sidebar.open{left:0}.docs-content{padding:32px 24px}.prev-next{grid-template-columns:1fr}}
+</style><script type="module">document.querySelector(".nav-mobile-toggle")?.addEventListener("click",()=>{document.querySelector(".docs-sidebar")?.classList.toggle("open")});
+</script></head> <body>  <nav class="nav" data-astro-cid-dmqpwcec> <div class="nav-inner container" data-astro-cid-dmqpwcec> <a href="/" class="nav-logo" data-astro-cid-dmqpwcec> <span class="nav-logo-accent" data-astro-cid-dmqpwcec>J</span>APL
+</a> <div class="nav-links" data-astro-cid-dmqpwcec> <a href="/docs/tour/01-values" data-astro-cid-dmqpwcec>Tour</a> <a href="/docs/guide" data-astro-cid-dmqpwcec>Guide</a> <a href="/docs/reference" data-astro-cid-dmqpwcec>Reference</a> <a href="/examples" data-astro-cid-dmqpwcec>Examples</a> <a href="/research" data-astro-cid-dmqpwcec>Research</a> <a href="/blog" data-astro-cid-dmqpwcec>Blog</a> <a href="https://github.com/YonedaAI/japl" target="_blank" rel="noopener" data-astro-cid-dmqpwcec>GitHub</a> </div> <button class="nav-mobile-toggle" aria-label="Toggle menu" data-astro-cid-dmqpwcec> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" data-astro-cid-dmqpwcec> <line x1="3" y1="6" x2="21" y2="6" data-astro-cid-dmqpwcec></line> <line x1="3" y1="12" x2="21" y2="12" data-astro-cid-dmqpwcec></line> <line x1="3" y1="18" x2="21" y2="18" data-astro-cid-dmqpwcec></line> </svg> </button> </div> </nav>   <div class="docs-wrapper"> <aside class="docs-sidebar"> <div class="docs-sidebar-logo"> <a href="/"><span>J</span>APL</a> </div> <div class="sidebar-section"> <div class="sidebar-section-title">Tour</div> <a href="/docs/tour/01-values" class="sidebar-link"> Values &amp; Bindings </a><a href="/docs/tour/02-types" class="sidebar-link"> Types </a><a href="/docs/tour/03-functions" class="sidebar-link"> Functions </a><a href="/docs/tour/04-pattern-matching" class="sidebar-link"> Pattern Matching </a><a href="/docs/tour/05-algebraic-types" class="sidebar-link"> Algebraic Types </a><a href="/docs/tour/06-error-handling" class="sidebar-link"> Error Handling </a><a href="/docs/tour/07-ownership" class="sidebar-link"> Ownership </a><a href="/docs/tour/08-processes" class="sidebar-link"> Processes </a><a href="/docs/tour/09-modules" class="sidebar-link"> Modules </a><a href="/docs/tour/10-traits" class="sidebar-link"> Traits </a> </div><div class="sidebar-section"> <div class="sidebar-section-title">Guide</div> <a href="/docs/guide/getting-started" class="sidebar-link"> Getting Started </a><a href="/docs/guide/type-system" class="sidebar-link"> Type System </a><a href="/docs/guide/concurrency" class="sidebar-link"> Concurrency </a> </div><div class="sidebar-section"> <div class="sidebar-section-title">Reference</div> <a href="/docs/reference/syntax" class="sidebar-link"> Syntax </a><a href="/docs/reference/compiler" class="sidebar-link"> Compiler </a> </div> </aside> <main class="docs-content"> <nav class="breadcrumbs" aria-label="Breadcrumb"> <a href="/">Home</a> <span class="separator">/</span> <a href="/docs/tour/01-values">Docs</a>  <span class="separator">/</span> <a href="/docs/guide">Guide</a>  <span class="separator">/</span> <span>Effect System</span> </nav> <div class="doc-header"> <h1> Effect System <span class="status-badge preview">preview</span> </h1> <p class="description">Deep dive into JAPL&#39;s effect rows, effect tracking, handlers, and the algebra of computational effects.</p> </div> <article class="doc-body">  <h1 id="effect-system">Effect System</h1>
+<p>Every function has side effects — or it does not. In most languages, you cannot tell which from the signature. A function called <code>get_user</code> might read from a database, log to a file, send a network request, or simply look up a value in a map. You have to read the implementation to know.</p>
+<p>JAPL makes effects explicit. Every function signature declares which computational effects it performs. Pure functions have no annotation. Effectful functions list their effects after the <code>with</code> keyword. The compiler enforces these declarations: if you call an effectful function from a pure context, you get a type error.</p>
+<p>This is not about restricting what you can do — it is about making what you do visible. When you see a function’s type, you know exactly what it can and cannot do.</p>
+<h2 id="effect-types">Effect Types</h2>
+<p>JAPL tracks the following base effects:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Effect</th><th>Meaning</th></tr></thead><tbody><tr><td><code>Pure</code></td><td>No effects (the default; not written)</td></tr><tr><td><code>Io</code></td><td>File system, console, clock, random</td></tr><tr><td><code>Async</code></td><td>Asynchronous operations</td></tr><tr><td><code>Net</code></td><td>Network access</td></tr><tr><td><code>State[s]</code></td><td>Local mutable state of type <code>s</code></td></tr><tr><td><code>Process[m]</code></td><td>Process operations with mailbox type <code>m</code></td></tr><tr><td><code>Fail[e]</code></td><td>May fail with error type <code>e</code></td></tr></tbody></table>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="japl"><code><span class="line"><span style="color:#6A737D">-- Pure function: no annotation needed</span></span>
+<span class="line"><span style="color:#F97583">fn</span><span style="color:#B392F0"> add</span><span style="color:#E1E4E8">(a: </span><span style="color:#B392F0">Int</span><span style="color:#E1E4E8">, b: </span><span style="color:#B392F0">Int</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-&gt;</span><span style="color:#B392F0"> Int</span><span style="color:#E1E4E8"> =</span></span>
+<span class="line"><span style="color:#E1E4E8">  a </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> b</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">-- Effectful function: effects listed after `with`</span></span>
+<span class="line"><span style="color:#F97583">fn</span><span style="color:#B392F0"> read_config</span><span style="color:#E1E4E8">(path: </span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-&gt;</span><span style="color:#B392F0"> Config</span><span style="color:#F97583"> with</span><span style="color:#B392F0"> Io</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Fail</span><span style="color:#E1E4E8">[</span><span style="color:#B392F0">ConfigError</span><span style="color:#E1E4E8">] =</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> text = </span><span style="color:#B392F0">File</span><span style="color:#E1E4E8">.read_to_string(path)</span><span style="color:#F97583">?</span></span>
+<span class="line"><span style="color:#E1E4E8">  parse_config(text)</span><span style="color:#F97583">?</span></span>
+<span class="line"></span></code></pre>
+<h2 id="effect-algebra">Effect Algebra</h2>
+<p>Effects in JAPL form a commutative, idempotent monoid. This sounds abstract, but the rules are intuitive:</p>
+<ul>
+<li><strong>Identity:</strong> <code>Pure</code> is the empty effect set. A pure function has no effects.</li>
+<li><strong>Composition:</strong> <code>with E1, E2</code> is the union of <code>E1</code> and <code>E2</code>. Effects accumulate.</li>
+<li><strong>Commutativity:</strong> <code>with Io, Net</code> is the same as <code>with Net, Io</code>. Order does not matter.</li>
+<li><strong>Idempotency:</strong> <code>with Io, Io</code> is the same as <code>with Io</code>. Duplicates are harmless.</li>
+</ul>
+<p>These properties mean you never have to worry about effect ordering or duplication. Effects simply compose.</p>
+<h2 id="effect-hierarchy">Effect Hierarchy</h2>
+<p>Effects have a subtyping relationship:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="plaintext"><code><span class="line"><span>Pure &lt; State[s] &lt; Io</span></span>
+<span class="line"><span>Pure &lt; Fail[e]</span></span>
+<span class="line"><span>Pure &lt; Process &lt; Async</span></span>
+<span class="line"><span>Pure &lt; Net &lt; Io</span></span>
+<span class="line"><span></span></span></code></pre>
+<p>A function with effect set <code>E1</code> may call a function with effect set <code>E2</code> if and only if <code>E2</code> is a subset of <code>E1</code>. Put simply: an <code>Io</code> function can call <code>Net</code> functions (since <code>Net &lt; Io</code>), but a <code>Pure</code> function cannot call an <code>Io</code> function.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="japl"><code><span class="line"><span style="color:#6A737D">-- This function has effects Io, Net, Fail[AppError]</span></span>
+<span class="line"><span style="color:#F97583">fn</span><span style="color:#B392F0"> handler</span><span style="color:#E1E4E8">(req: </span><span style="color:#B392F0">Request</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-&gt;</span><span style="color:#B392F0"> Response</span><span style="color:#F97583"> with</span><span style="color:#B392F0"> Io</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Net</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Fail</span><span style="color:#E1E4E8">[</span><span style="color:#B392F0">AppError</span><span style="color:#E1E4E8">] =</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> config = read_config(</span><span style="color:#9ECBFF">&quot;/etc/app.conf&quot;</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">?</span><span style="color:#6A737D">   -- adds Io, Fail</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> data = </span><span style="color:#B392F0">Http</span><span style="color:#E1E4E8">.get(config.data_url)</span><span style="color:#F97583">?</span><span style="color:#6A737D">         -- adds Net</span></span>
+<span class="line"><span style="color:#E1E4E8">  process_response(data)                        </span><span style="color:#6A737D">-- pure: always allowed</span></span>
+<span class="line"></span></code></pre>
+<h2 id="effect-inference">Effect Inference</h2>
+<p>Within a function body, effects are inferred from the operations performed. You do not need to annotate which specific line produces which effect — the compiler figures it out. At module boundaries, effect signatures are checked against the inferred effects.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="japl"><code><span class="line"><span style="color:#6A737D">-- The compiler infers this function has effects: Io, Fail[ParseError]</span></span>
+<span class="line"><span style="color:#F97583">fn</span><span style="color:#B392F0"> load_config</span><span style="color:#E1E4E8">(path: </span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-&gt;</span><span style="color:#B392F0"> Config</span><span style="color:#F97583"> with</span><span style="color:#B392F0"> Io</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Fail</span><span style="color:#E1E4E8">[</span><span style="color:#B392F0">ParseError</span><span style="color:#E1E4E8">] =</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> text = </span><span style="color:#B392F0">File</span><span style="color:#E1E4E8">.read_to_string(path)   </span><span style="color:#6A737D">-- infers Io</span></span>
+<span class="line"><span style="color:#E1E4E8">  parse_config(text)                      </span><span style="color:#6A737D">-- infers Fail[ParseError]</span></span>
+<span class="line"></span></code></pre>
+<p>If you declare fewer effects than the body requires, the compiler reports an error. If you declare more effects than the body uses, that is allowed (your function is conservatively annotated).</p>
+<h2 id="effect-handlers">Effect Handlers</h2>
+<p>Effect handlers interpret effectful computations, discharging their effects. They let you run effectful code in a context that provides the effect’s implementation, producing a pure value.</p>
+<h3 id="handling-state">Handling State</h3>
+<p><code>State.run</code> takes an initial state and a computation with <code>State[s]</code> effect, and produces a pure value:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="japl"><code><span class="line"><span style="color:#F97583">fn</span><span style="color:#B392F0"> accumulate</span><span style="color:#E1E4E8">(items: </span><span style="color:#B392F0">List</span><span style="color:#E1E4E8">[</span><span style="color:#B392F0">Int</span><span style="color:#E1E4E8">]) </span><span style="color:#F97583">-&gt;</span><span style="color:#B392F0"> Int</span><span style="color:#F97583"> with</span><span style="color:#B392F0"> State</span><span style="color:#E1E4E8">[</span><span style="color:#B392F0">Int</span><span style="color:#E1E4E8">] =</span></span>
+<span class="line"><span style="color:#B392F0">  List</span><span style="color:#E1E4E8">.each(items, </span><span style="color:#F97583">fn</span><span style="color:#B392F0"> x</span><span style="color:#F97583"> -&gt;</span><span style="color:#B392F0"> State</span><span style="color:#E1E4E8">.modify(</span><span style="color:#F97583">fn</span><span style="color:#B392F0"> acc</span><span style="color:#F97583"> -&gt;</span><span style="color:#E1E4E8"> acc </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> x))</span></span>
+<span class="line"><span style="color:#B392F0">  State</span><span style="color:#E1E4E8">.get()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">fn</span><span style="color:#B392F0"> main</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">-&gt;</span><span style="color:#B392F0"> Unit</span><span style="color:#F97583"> with</span><span style="color:#B392F0"> Io</span><span style="color:#E1E4E8"> =</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> result = </span><span style="color:#B392F0">State</span><span style="color:#E1E4E8">.run(</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">fn</span><span style="color:#F97583"> -&gt;</span></span>
+<span class="line"><span style="color:#E1E4E8">    accumulate([</span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">3</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">4</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">5</span><span style="color:#E1E4E8">])</span></span>
+<span class="line"><span style="color:#E1E4E8">  )</span></span>
+<span class="line"><span style="color:#B392F0">  Io</span><span style="color:#E1E4E8">.println(</span><span style="color:#B392F0">Int</span><span style="color:#E1E4E8">.to_string(result))  </span><span style="color:#6A737D">-- prints 15</span></span>
+<span class="line"></span></code></pre>
+<h3 id="handling-fail">Handling Fail</h3>
+<p><code>Fail.catch</code> converts a computation with <code>Fail[e]</code> into a <code>Result[a, e]</code> value:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="japl"><code><span class="line"><span style="color:#F97583">let</span><span style="color:#E1E4E8"> result: </span><span style="color:#B392F0">Result</span><span style="color:#E1E4E8">[</span><span style="color:#B392F0">Config</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">ConfigError</span><span style="color:#E1E4E8">] = </span><span style="color:#B392F0">Fail</span><span style="color:#E1E4E8">.catch(</span><span style="color:#F97583">fn</span><span style="color:#F97583"> -&gt;</span></span>
+<span class="line"><span style="color:#E1E4E8">  read_config(</span><span style="color:#9ECBFF">&quot;/etc/app.conf&quot;</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">match</span><span style="color:#E1E4E8"> result </span><span style="color:#F97583">with</span></span>
+<span class="line"><span style="color:#E1E4E8">| </span><span style="color:#B392F0">Ok</span><span style="color:#E1E4E8">(config) </span><span style="color:#F97583">-&gt;</span><span style="color:#E1E4E8"> use_config(config)</span></span>
+<span class="line"><span style="color:#E1E4E8">| </span><span style="color:#B392F0">Err</span><span style="color:#E1E4E8">(e) </span><span style="color:#F97583">-&gt;</span><span style="color:#E1E4E8"> handle_error(e)</span></span>
+<span class="line"></span></code></pre>
+<h3 id="composing-handlers">Composing Handlers</h3>
+<p>Effects can be handled at any level, and handlers compose naturally:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="japl"><code><span class="line"><span style="color:#F97583">fn</span><span style="color:#B392F0"> main</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">-&gt;</span><span style="color:#B392F0"> Unit</span><span style="color:#F97583"> with</span><span style="color:#B392F0"> Io</span><span style="color:#E1E4E8"> =</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> result = </span><span style="color:#B392F0">Fail</span><span style="color:#E1E4E8">.catch(</span><span style="color:#F97583">fn</span><span style="color:#F97583"> -&gt;</span></span>
+<span class="line"><span style="color:#B392F0">    State</span><span style="color:#E1E4E8">.run(</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">fn</span><span style="color:#F97583"> -&gt;</span></span>
+<span class="line"><span style="color:#E1E4E8">      complex_computation()</span></span>
+<span class="line"><span style="color:#E1E4E8">    )</span></span>
+<span class="line"><span style="color:#E1E4E8">  )</span></span>
+<span class="line"><span style="color:#F97583">  match</span><span style="color:#E1E4E8"> result </span><span style="color:#F97583">with</span></span>
+<span class="line"><span style="color:#E1E4E8">  | </span><span style="color:#B392F0">Ok</span><span style="color:#E1E4E8">(value) </span><span style="color:#F97583">-&gt;</span><span style="color:#B392F0"> Io</span><span style="color:#E1E4E8">.println(</span><span style="color:#9ECBFF">&quot;Success: &quot;</span><span style="color:#F97583"> ++</span><span style="color:#E1E4E8"> show(value))</span></span>
+<span class="line"><span style="color:#E1E4E8">  | </span><span style="color:#B392F0">Err</span><span style="color:#E1E4E8">(e) </span><span style="color:#F97583">-&gt;</span><span style="color:#B392F0"> Io</span><span style="color:#E1E4E8">.println(</span><span style="color:#9ECBFF">&quot;Error: &quot;</span><span style="color:#F97583"> ++</span><span style="color:#E1E4E8"> show(e))</span></span>
+<span class="line"></span></code></pre>
+<p>Each handler discharges one effect, peeling away layers until you reach a pure value or the outermost <code>Io</code> effect in <code>main</code>.</p>
+<h2 id="effect-compatibility">Effect Compatibility</h2>
+<p>The effect system prevents calling effectful functions from pure contexts. Here is the compatibility table:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Callee Effect</th><th>Can be called from</th></tr></thead><tbody><tr><td><code>Pure</code></td><td>Any context</td></tr><tr><td><code>Fail[e]</code></td><td>Functions with <code>Fail[e]</code> or functions returning <code>Result</code></td></tr><tr><td><code>State[s]</code></td><td>Functions with <code>State[s]</code> or <code>Io</code></td></tr><tr><td><code>Process</code></td><td>Functions with <code>Process</code> or <code>Async</code></td></tr><tr><td><code>Net</code></td><td>Functions with <code>Net</code> or <code>Io</code></td></tr><tr><td><code>Io</code></td><td>Functions with <code>Io</code></td></tr><tr><td><code>Async</code></td><td>Functions with <code>Async</code></td></tr></tbody></table>
+<blockquote>
+<p><strong>Comparison with Other Languages</strong></p>
+<p>Haskell tracks effects through the <code>IO</code> monad, which is a single coarse-grained effect. Everything effectful is <code>IO</code>, and you cannot distinguish between file access and network access at the type level. JAPL’s effect rows provide fine-grained tracking: you can see exactly which effects a function uses.</p>
+<p>Koka and Frank also use algebraic effects with handlers, but they expose the full generality of user-defined effects and handlers. JAPL takes a more pragmatic approach with a fixed set of well-known effects, trading some generality for simplicity and predictability.</p>
+<p>Rust has no effect system. Side effects are tracked informally through naming conventions and documentation. JAPL makes this tracking formal and compiler-verified.</p>
+</blockquote>
+<h2 id="effects-and-processes">Effects and Processes</h2>
+<p>The <code>Process[m]</code> effect is special: it is available inside process bodies and enables spawn, send, and receive operations. The type parameter <code>m</code> specifies the mailbox message type.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="japl"><code><span class="line"><span style="color:#F97583">fn</span><span style="color:#B392F0"> counter</span><span style="color:#E1E4E8">(count: </span><span style="color:#B392F0">Int</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-&gt;</span><span style="color:#B392F0"> Never</span><span style="color:#F97583"> with</span><span style="color:#B392F0"> Process</span><span style="color:#E1E4E8">[</span><span style="color:#B392F0">CounterMsg</span><span style="color:#E1E4E8">] =</span></span>
+<span class="line"><span style="color:#F97583">  match</span><span style="color:#B392F0"> Process</span><span style="color:#E1E4E8">.</span><span style="color:#F97583">receive</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">with</span></span>
+<span class="line"><span style="color:#E1E4E8">  | </span><span style="color:#B392F0">Increment</span><span style="color:#F97583"> -&gt;</span><span style="color:#E1E4E8"> counter(count </span><span style="color:#F97583">+</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">  | </span><span style="color:#B392F0">Decrement</span><span style="color:#F97583"> -&gt;</span><span style="color:#E1E4E8"> counter(count </span><span style="color:#F97583">-</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">  | </span><span style="color:#B392F0">GetCount</span><span style="color:#E1E4E8">(reply) </span><span style="color:#F97583">-&gt;</span></span>
+<span class="line"><span style="color:#B392F0">      Reply</span><span style="color:#E1E4E8">.</span><span style="color:#F97583">send</span><span style="color:#E1E4E8">(reply, count)</span></span>
+<span class="line"><span style="color:#E1E4E8">      counter(count)</span></span>
+<span class="line"></span></code></pre>
+<p>The Process effect ensures that process operations cannot be called from pure code, and the mailbox type parameter prevents sending messages of the wrong type.</p>
+<h2 id="effects-and-the-module-system">Effects and the Module System</h2>
+<p>At module boundaries, effect signatures serve as contracts. When you import a function from another module, its effect signature tells you exactly what side effects calling it will introduce. This makes it possible to reason about effects locally without reading the implementation of every function you call.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="japl"><code><span class="line"><span style="color:#F97583">module</span><span style="color:#B392F0"> Http</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">Server</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#B392F0"> Http</span><span style="color:#E1E4E8">.{</span><span style="color:#B392F0">Request</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Response</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Status</span><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">-- The effect signature is the contract</span></span>
+<span class="line"><span style="color:#F97583">fn</span><span style="color:#B392F0"> handle_request</span><span style="color:#E1E4E8">(req: </span><span style="color:#B392F0">Request</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-&gt;</span><span style="color:#B392F0"> Response</span><span style="color:#F97583"> with</span><span style="color:#B392F0"> Io</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Net</span><span style="color:#E1E4E8"> =</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> body = </span><span style="color:#B392F0">Json</span><span style="color:#E1E4E8">.parse(req.body)</span></span>
+<span class="line"><span style="color:#F97583">  match</span><span style="color:#E1E4E8"> body </span><span style="color:#F97583">with</span></span>
+<span class="line"><span style="color:#E1E4E8">  | </span><span style="color:#B392F0">Ok</span><span style="color:#E1E4E8">(data) </span><span style="color:#F97583">-&gt;</span><span style="color:#B392F0"> Response</span><span style="color:#E1E4E8">.json(</span><span style="color:#B392F0">Status</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">Ok</span><span style="color:#E1E4E8">, data)</span></span>
+<span class="line"><span style="color:#E1E4E8">  | </span><span style="color:#B392F0">Err</span><span style="color:#E1E4E8">(_) </span><span style="color:#F97583">-&gt;</span><span style="color:#B392F0"> Response</span><span style="color:#E1E4E8">.text(</span><span style="color:#B392F0">Status</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">BadRequest</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">&quot;invalid JSON&quot;</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span></code></pre>
+<h2 id="common-patterns">Common Patterns</h2>
+<h3 id="effect-polymorphism">Effect Polymorphism</h3>
+<p>Functions can be polymorphic over effects, accepting any effectful computation:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="japl"><code><span class="line"><span style="color:#F97583">fn</span><span style="color:#B392F0"> timed</span><span style="color:#E1E4E8">[a](label: </span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">, f: </span><span style="color:#F97583">fn</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">-&gt;</span><span style="color:#E1E4E8"> a </span><span style="color:#F97583">with</span><span style="color:#B392F0"> Io</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-&gt;</span><span style="color:#E1E4E8"> a </span><span style="color:#F97583">with</span><span style="color:#B392F0"> Io</span><span style="color:#E1E4E8"> =</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> start = </span><span style="color:#B392F0">Io</span><span style="color:#E1E4E8">.clock()</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> result = f()</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> elapsed = </span><span style="color:#B392F0">Io</span><span style="color:#E1E4E8">.clock() </span><span style="color:#F97583">-</span><span style="color:#E1E4E8"> start</span></span>
+<span class="line"><span style="color:#B392F0">  Io</span><span style="color:#E1E4E8">.println(label </span><span style="color:#F97583">++</span><span style="color:#9ECBFF"> &quot;: &quot;</span><span style="color:#F97583"> ++</span><span style="color:#B392F0"> Float</span><span style="color:#E1E4E8">.to_string(elapsed) </span><span style="color:#F97583">++</span><span style="color:#9ECBFF"> &quot;ms&quot;</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">  result</span></span>
+<span class="line"></span></code></pre>
+<h3 id="layered-effect-handling">Layered Effect Handling</h3>
+<p>Build applications by handling effects at appropriate levels:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="japl"><code><span class="line"><span style="color:#F97583">fn</span><span style="color:#B392F0"> app_main</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">-&gt;</span><span style="color:#B392F0"> Unit</span><span style="color:#F97583"> with</span><span style="color:#B392F0"> Io</span><span style="color:#E1E4E8"> =</span></span>
+<span class="line"><span style="color:#6A737D">  -- Handle Fail at the top level</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> result = </span><span style="color:#B392F0">Fail</span><span style="color:#E1E4E8">.catch(</span><span style="color:#F97583">fn</span><span style="color:#F97583"> -&gt;</span></span>
+<span class="line"><span style="color:#6A737D">    -- Handle State for request-scoped data</span></span>
+<span class="line"><span style="color:#B392F0">    State</span><span style="color:#E1E4E8">.run(initial_context(), </span><span style="color:#F97583">fn</span><span style="color:#F97583"> -&gt;</span></span>
+<span class="line"><span style="color:#E1E4E8">      process_request(incoming_request)</span></span>
+<span class="line"><span style="color:#E1E4E8">    )</span></span>
+<span class="line"><span style="color:#E1E4E8">  )</span></span>
+<span class="line"><span style="color:#F97583">  match</span><span style="color:#E1E4E8"> result </span><span style="color:#F97583">with</span></span>
+<span class="line"><span style="color:#E1E4E8">  | </span><span style="color:#B392F0">Ok</span><span style="color:#E1E4E8">(response) </span><span style="color:#F97583">-&gt;</span><span style="color:#E1E4E8"> send_response(response)</span></span>
+<span class="line"><span style="color:#E1E4E8">  | </span><span style="color:#B392F0">Err</span><span style="color:#E1E4E8">(e) </span><span style="color:#F97583">-&gt;</span><span style="color:#E1E4E8"> send_error_response(e)</span></span>
+<span class="line"></span></code></pre>
+<h2 id="best-practices">Best Practices</h2>
+<p><strong>Keep functions as pure as possible.</strong> The fewer effects a function has, the easier it is to test, compose, and reason about. Extract pure logic from effectful functions wherever you can.</p>
+<p><strong>Use <code>Fail[e]</code> instead of returning <code>Result</code> directly</strong> when the error should propagate automatically. The <code>?</code> operator works with both, but <code>Fail[e]</code> composes more cleanly in effect signatures.</p>
+<p><strong>Handle effects at the boundaries.</strong> Let effects propagate through your application and handle them at the edges: in <code>main</code>, in HTTP handlers, in process entry points. This keeps the interior of your application maximally pure.</p>
+<p><strong>Prefer fine-grained effects.</strong> Use <code>Net</code> instead of <code>Io</code> when a function only does network operations. More precise effect signatures give callers better information about what a function actually does.</p>  </article> <div class="prev-next"><a href="/guide/02-ownership" class="prev-next-link"><span class="prev-next-label">Previous</span><span class="prev-next-title">Ownership &amp; Linearity</span></a><a href="/guide/04-processes" class="prev-next-link next"><span class="prev-next-label">Next</span><span class="prev-next-title">Process Model</span></a></div> <a href="https://github.com/YonedaAI/japl/edit/main/docs/guide/03-effects.mdx" class="edit-link" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+Edit this page on GitHub
+</a> </main> </div> <footer class="footer" data-astro-cid-sz7xmlte> <div class="footer-inner container" data-astro-cid-sz7xmlte> <div class="footer-brand" data-astro-cid-sz7xmlte> <span class="footer-logo" data-astro-cid-sz7xmlte><span class="footer-logo-accent" data-astro-cid-sz7xmlte>J</span>APL</span> <p class="footer-tagline" data-astro-cid-sz7xmlte>Strict typed functional programming.<br data-astro-cid-sz7xmlte>Rust ownership. Erlang processes. Go simplicity.</p> </div> <div class="footer-links" data-astro-cid-sz7xmlte> <div class="footer-col" data-astro-cid-sz7xmlte> <h4 data-astro-cid-sz7xmlte>Learn</h4> <a href="/docs/tour/01-values" data-astro-cid-sz7xmlte>Language Tour</a> <a href="/docs/guide" data-astro-cid-sz7xmlte>Guide</a> <a href="/docs/reference" data-astro-cid-sz7xmlte>Reference</a> </div> <div class="footer-col" data-astro-cid-sz7xmlte> <h4 data-astro-cid-sz7xmlte>Community</h4> <a href="https://github.com/YonedaAI/japl" target="_blank" rel="noopener" data-astro-cid-sz7xmlte>GitHub</a> <a href="https://github.com/YonedaAI/japl/issues" target="_blank" rel="noopener" data-astro-cid-sz7xmlte>Issues</a> </div> </div> <div class="footer-bottom" data-astro-cid-sz7xmlte> <p data-astro-cid-sz7xmlte>Built by <a href="https://yonedaai.com" target="_blank" rel="noopener" data-astro-cid-sz7xmlte>YonedaAI</a></p> </div> </div> </footer>   </body></html>

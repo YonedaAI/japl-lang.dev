@@ -1,0 +1,277 @@
+---
+title: "Records"
+description: "Deep dive into JAPL's record types, field access, update syntax, row polymorphism, and structural typing."
+status: "stable"
+order: 10
+section: "guide"
+prev: { title: "Traits", slug: "guide/09-traits" }
+next: { title: "Testing", slug: "guide/11-testing" }
+---
+
+# Records
+
+Records are JAPL's primary way to group related data. They are structurally typed, which means two records with the same fields and types are interchangeable -- no nominal declaration required. Combined with row polymorphism, records enable a style of programming where functions work on any data that has the right shape, without requiring shared base types or interfaces.
+
+This is a departure from both Rust (where structs are nominal) and Haskell (where record field names are global and prone to conflicts). JAPL's structural records with row polymorphism provide the flexibility of duck typing with the safety of static types.
+
+## Defining Record Types
+
+Record types can be defined as named types or used anonymously:
+
+```japl
+-- Named record type
+type User = {
+  id: Int,
+  name: String,
+  email: String,
+  created_at: Timestamp,
+}
+
+-- Anonymous record (structural type, no declaration needed)
+let point = { x = 3.0, y = 4.0 }
+-- point has type { x: Float, y: Float }
+```
+
+Named record types provide a convenient alias but do not change the structural typing behavior. A `User` value is interchangeable with any `{ id: Int, name: String, email: String, created_at: Timestamp }`.
+
+## Creating Records
+
+Records are created with field name and value pairs:
+
+```japl
+let alice = {
+  id = 1,
+  name = "Alice",
+  email = "alice@example.com",
+  created_at = Time.now(),
+}
+
+-- Shorter records on one line
+let origin = { x = 0.0, y = 0.0 }
+```
+
+All fields must be provided when creating a record. There are no optional fields or default values at the construction site -- this ensures that every record is fully initialized.
+
+## Field Access
+
+Fields are accessed with dot notation:
+
+```japl
+let user_name = alice.name
+let x_coord = origin.x
+```
+
+Field access is type-checked. Accessing a field that does not exist is a compile error, not a runtime error.
+
+## Record Update Syntax
+
+Record update creates a new record identical to an existing one, except for the specified fields. The original record is unchanged:
+
+```japl
+let updated_alice = { alice | name = "Alice Smith", email = "alice.smith@example.com" }
+-- alice is still { id = 1, name = "Alice", email = "alice@example.com", ... }
+-- updated_alice is { id = 1, name = "Alice Smith", email = "alice.smith@example.com", ... }
+```
+
+Update syntax can change the types of fields:
+
+```japl
+let point2d = { x = 1.0, y = 2.0 }
+-- point2d : { x: Float, y: Float }
+
+let point3d = { point2d | z = 3.0 }
+-- This adds a field, creating: { x: Float, y: Float, z: Float }
+```
+
+## Row Polymorphism
+
+Row polymorphism is JAPL's mechanism for writing functions that work on any record with certain fields, regardless of what other fields it has. A row variable (written as `| rest` in the type) captures "the rest of the fields."
+
+```japl
+fn get_name(r: { name: String | rest }) -> String =
+  r.name
+```
+
+This function accepts any record that has at least a `name: String` field:
+
+```japl
+-- All valid calls:
+get_name({ name = "Alice" })
+get_name({ name = "Bob", age = 30 })
+get_name({ name = "Charlie", role = Admin, email = "c@b.com" })
+```
+
+### How Row Variables Work
+
+The row variable `rest` is a type variable that unifies with whatever remaining fields the record has. When you call `get_name({ name = "Bob", age = 30 })`, the compiler unifies `rest` with `{ age: Int }`.
+
+This is type-safe: the function can only access fields explicitly listed in its type. Even though the record might have many other fields, the function cannot access them through the row variable.
+
+### Multiple Row-Polymorphic Parameters
+
+Functions can accept multiple row-polymorphic records:
+
+```japl
+fn merge_names(a: { first_name: String | r1 }, b: { last_name: String | r2 }) -> String =
+  a.first_name ++ " " ++ b.last_name
+```
+
+### Row Polymorphism and Record Updates
+
+Record updates preserve row polymorphism:
+
+```japl
+fn increment_age(person: { age: Int | rest }) -> { age: Int | rest } =
+  { person | age = person.age + 1 }
+```
+
+The return type preserves all the original fields. If you pass a `{ name: String, age: Int, email: String }`, you get back a `{ name: String, age: Int, email: String }` with the age incremented.
+
+> **Comparison with Other Languages**
+>
+> **TypeScript:** TypeScript objects are structurally typed but use width subtyping (extra fields are allowed). JAPL uses row polymorphism, which is more precise: the row variable explicitly captures the extra fields, enabling the type system to track them through transformations like record updates.
+>
+> **Rust:** Rust structs are nominally typed. A function taking `struct User` cannot accept `struct Employee` even if they have the same fields. JAPL's structural typing with row polymorphism provides more flexibility.
+>
+> **Haskell:** Haskell records have globally scoped field names, leading to name conflicts. Extensions like OverloadedRecordDot improve the situation. JAPL's records have module-scoped names by default and row polymorphism built in.
+>
+> **Elm:** Elm has extensible records with row polymorphism, very similar to JAPL's approach. JAPL extends this with record update syntax that can change field types.
+
+## Structural Typing
+
+JAPL records are structurally typed: two records with the same fields and types are the same type, regardless of how they were defined.
+
+```japl
+type Point2D = { x: Float, y: Float }
+type Vector2D = { x: Float, y: Float }
+
+fn magnitude(v: Vector2D) -> Float =
+  Float.sqrt(v.x * v.x + v.y * v.y)
+
+let point: Point2D = { x = 3.0, y = 4.0 }
+let m = magnitude(point)  -- valid: Point2D and Vector2D have the same structure
+```
+
+This is a deliberate design choice. Named type aliases like `Point2D` and `Vector2D` are documentation, not barriers. If you need true type distinction, use opaque types:
+
+```japl
+module Point =
+  opaque type Point2D
+  fn new(x: Float, y: Float) -> Point2D = ...
+
+module Vector =
+  opaque type Vector2D
+  fn new(x: Float, y: Float) -> Vector2D = ...
+```
+
+Now `Point2D` and `Vector2D` are distinct types that cannot be used interchangeably.
+
+## Pattern Matching on Records
+
+Records can be destructured in pattern matching:
+
+```japl
+fn greet(user: User) -> String =
+  match user with
+  | { name, email } -> "Hello, " ++ name ++ " (" ++ email ++ ")"
+```
+
+You can match on specific fields and ignore the rest:
+
+```japl
+fn is_admin(user: { role: Role | rest }) -> Bool =
+  match user with
+  | { role = Admin } -> True
+  | _ -> False
+```
+
+## Packed Records
+
+For performance-critical code, the `packed` qualifier requests contiguous memory layout:
+
+```japl
+type Vec3 = packed { x: Float32, y: Float32, z: Float32 }
+type Color = packed { r: Int, g: Int, b: Int, a: Int }
+```
+
+Packed records have no pointer indirection and no padding beyond alignment requirements. This makes them suitable for GPU data, SIMD operations, and any context where cache locality matters.
+
+Packed records can only contain fixed-size types: no polymorphic fields, no strings, no lists.
+
+## Common Patterns
+
+### Builder Pattern
+
+Build up records incrementally using updates:
+
+```japl
+fn default_config() -> Config =
+  { host = "localhost"
+  , port = 8080
+  , max_connections = 100
+  , timeout_ms = 5000
+  }
+
+let my_config = { default_config() | port = 9090, max_connections = 500 }
+```
+
+### Accessor Functions
+
+Use row polymorphism to write reusable accessor functions:
+
+```japl
+fn get_id(r: { id: Int | rest }) -> Int = r.id
+fn get_name(r: { name: String | rest }) -> String = r.name
+fn get_email(r: { email: String | rest }) -> String = r.email
+```
+
+These work on any record with the matching field, regardless of what other fields are present.
+
+### Record-Based Configuration
+
+Use records for configuration with type-safe defaults:
+
+```japl
+type ServerConfig = {
+  host: String,
+  port: Int,
+  workers: Int,
+  log_level: LogLevel,
+}
+
+fn start_server(config: ServerConfig) -> Unit with Io, Process =
+  Io.println("Starting server on " ++ config.host ++ ":" ++ Int.to_string(config.port))
+  -- ...
+```
+
+### Transforming Records
+
+Use row polymorphism to write generic record transformations:
+
+```japl
+fn with_timestamp(r: { | rest }) -> { created_at: Timestamp | rest } with Io =
+  { r | created_at = Time.now() }
+
+fn with_id(r: { | rest }, id: Int) -> { id: Int | rest } =
+  { r | id = id }
+
+-- Compose transformations:
+let user_data = { name = "Alice", email = "alice@example.com" }
+  |> with_id(1)
+  |> with_timestamp
+-- Result: { id: Int, name: String, email: String, created_at: Timestamp }
+```
+
+## Best Practices
+
+**Use named types for documentation.** Even though `{ x: Float, y: Float }` and `Point2D` are structurally identical, naming the type makes code more readable and intentional.
+
+**Leverage row polymorphism for reusable functions.** Write functions that accept `{ name: String | rest }` rather than a specific record type. This makes your functions work with any data that has the right shape.
+
+**Use opaque types when distinction matters.** If `Point2D` and `Vector2D` should not be interchangeable (because they have different semantics), make them opaque types in separate modules.
+
+**Prefer record updates over manual reconstruction.** Instead of creating a new record with all fields copied manually, use update syntax. This is less error-prone and automatically preserves fields you did not intend to change.
+
+**Use packed records for performance-critical data.** When working with large arrays of small records (particles, vertices, pixels), use `packed` to ensure cache-friendly layout.
+
+**Keep records shallow.** Deeply nested records are hard to update and pattern match on. Consider flattening your data or using separate types for distinct concerns.

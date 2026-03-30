@@ -1,0 +1,87 @@
+---
+title: "IO"
+description: "Reference for the IO standard library module providing file system operations."
+status: "preview"
+order: 7
+section: "stdlib"
+prev: { title: "Result", slug: "stdlib/06-result" }
+next: { title: "Process", slug: "stdlib/08-process" }
+---
+
+# IO
+
+The `IO` module provides file system operations. Functions in this module perform side effects and require the `Io` effect in the calling context.
+
+> **Status: Preview.** The IO module currently wraps Node.js file system functions via the foreign function interface. The API will stabilize as the native runtime matures.
+
+```japl
+import IO
+```
+
+---
+
+## Foreign Bindings
+
+The IO module declares foreign bindings to the underlying runtime:
+
+```japl
+foreign "node:fs" fn readFileSync(path: String, encoding: String) -> String
+foreign "node:fs" fn writeFileSync(path: String, content: String) -> String
+foreign "node:fs" fn existsSync(path: String) -> Bool
+```
+
+These are wrapped in safe public functions below.
+
+---
+
+## read_file
+
+```japl
+fn read_file(path: String) -> String
+```
+
+Reads the entire contents of a file as a UTF-8 string. The file is read synchronously.
+
+### Example
+
+```japl
+let content = IO.read_file("config.toml")
+println(content)
+```
+
+---
+
+## write_file
+
+```japl
+fn write_file(path: String, content: String) -> Unit
+```
+
+Writes a string to a file, creating the file if it does not exist or overwriting it if it does. The write is synchronous.
+
+### Example
+
+```japl
+IO.write_file("output.txt", "Hello, world!")
+```
+
+---
+
+## file_exists
+
+```japl
+fn file_exists(path: String) -> Bool
+```
+
+Returns `True` if a file exists at the given path, `False` otherwise.
+
+### Example
+
+```japl
+if IO.file_exists("config.toml") {
+  let config = IO.read_file("config.toml")
+  println("Config loaded")
+} else {
+  println("No config file found")
+}
+```

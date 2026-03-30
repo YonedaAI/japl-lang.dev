@@ -1,0 +1,301 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Grammar — JAPL</title><meta name="description" content="Complete EBNF grammar reference for the JAPL programming language."><!-- Open Graph --><meta property="og:type" content="website"><meta property="og:title" content="Grammar — JAPL"><meta property="og:description" content="Complete EBNF grammar reference for the JAPL programming language."><meta property="og:url" content="https://japl-lang.dev/docs/reference/02-grammar/"><meta property="og:image" content="https://japl-lang.dev/og-image.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:site_name" content="JAPL"><!-- Twitter Card --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Grammar — JAPL"><meta name="twitter:description" content="Complete EBNF grammar reference for the JAPL programming language."><meta name="twitter:image" content="https://japl-lang.dev/og-image.png"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="canonical" href="https://japl-lang.dev/docs/reference/02-grammar/"><link rel="stylesheet" href="/_astro/_slug_.CrD4dbaS.css">
+<style>.docs-wrapper{display:grid;grid-template-columns:260px 1fr;min-height:100vh;gap:0}.docs-sidebar{position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);padding:24px 0}.docs-sidebar-logo{padding:0 24px 24px;border-bottom:1px solid var(--border);margin-bottom:16px}.docs-sidebar-logo a{font-weight:800;font-size:1.25rem;color:var(--text)}.docs-sidebar-logo span{color:var(--accent)}.sidebar-section{padding:8px 0}.sidebar-section-title{padding:8px 24px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}.sidebar-link{display:block;padding:6px 24px 6px 32px;font-size:.875rem;color:var(--text-dim);transition:color .15s,background .15s;border-left:2px solid transparent}.sidebar-link:hover{color:var(--text);background:var(--accent-dim)}.sidebar-link.active{color:var(--accent);border-left-color:var(--accent);background:var(--accent-dim)}.docs-content{max-width:780px;padding:48px 56px}.breadcrumbs{display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--muted);margin-bottom:32px}.breadcrumbs a{color:var(--muted)}.breadcrumbs a:hover{color:var(--accent)}.breadcrumbs .separator{color:var(--border)}.doc-header{margin-bottom:40px}.doc-header h1{font-size:2rem;margin-bottom:8px}.doc-header .description{color:var(--text-dim);font-size:1.05rem}.status-badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-left:12px;vertical-align:middle}.status-badge.stable{background:#22c55e26;color:#22c55e}.status-badge.draft{background:#f9731626;color:#f97316}.status-badge.planned{background:#64748b26;color:#94a3b8}.prev-next{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:64px;padding-top:32px;border-top:1px solid var(--border)}.prev-next-link{display:flex;flex-direction:column;padding:16px 20px;border:1px solid var(--border);border-radius:var(--radius);transition:border-color .2s,background .2s}.prev-next-link:hover{border-color:var(--accent);background:var(--accent-dim)}.prev-next-link.next{text-align:right;align-items:flex-end}.prev-next-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px}.prev-next-title{font-weight:600;color:var(--text)}.edit-link{display:inline-flex;align-items:center;gap:6px;margin-top:40px;font-size:.8rem;color:var(--muted)}.edit-link:hover{color:var(--accent)}@media (max-width: 900px){.docs-wrapper{grid-template-columns:1fr}.docs-sidebar{position:fixed;left:-280px;width:280px;z-index:100;transition:left .3s ease}.docs-sidebar.open{left:0}.docs-content{padding:32px 24px}.prev-next{grid-template-columns:1fr}}
+</style><script type="module">document.querySelector(".nav-mobile-toggle")?.addEventListener("click",()=>{document.querySelector(".docs-sidebar")?.classList.toggle("open")});
+</script></head> <body>  <nav class="nav" data-astro-cid-dmqpwcec> <div class="nav-inner container" data-astro-cid-dmqpwcec> <a href="/" class="nav-logo" data-astro-cid-dmqpwcec> <span class="nav-logo-accent" data-astro-cid-dmqpwcec>J</span>APL
+</a> <div class="nav-links" data-astro-cid-dmqpwcec> <a href="/docs/tour/01-values" data-astro-cid-dmqpwcec>Tour</a> <a href="/docs/guide" data-astro-cid-dmqpwcec>Guide</a> <a href="/docs/reference" data-astro-cid-dmqpwcec>Reference</a> <a href="/examples" data-astro-cid-dmqpwcec>Examples</a> <a href="/research" data-astro-cid-dmqpwcec>Research</a> <a href="/blog" data-astro-cid-dmqpwcec>Blog</a> <a href="https://github.com/YonedaAI/japl" target="_blank" rel="noopener" data-astro-cid-dmqpwcec>GitHub</a> </div> <button class="nav-mobile-toggle" aria-label="Toggle menu" data-astro-cid-dmqpwcec> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" data-astro-cid-dmqpwcec> <line x1="3" y1="6" x2="21" y2="6" data-astro-cid-dmqpwcec></line> <line x1="3" y1="12" x2="21" y2="12" data-astro-cid-dmqpwcec></line> <line x1="3" y1="18" x2="21" y2="18" data-astro-cid-dmqpwcec></line> </svg> </button> </div> </nav>   <div class="docs-wrapper"> <aside class="docs-sidebar"> <div class="docs-sidebar-logo"> <a href="/"><span>J</span>APL</a> </div> <div class="sidebar-section"> <div class="sidebar-section-title">Tour</div> <a href="/docs/tour/01-values" class="sidebar-link"> Values &amp; Bindings </a><a href="/docs/tour/02-types" class="sidebar-link"> Types </a><a href="/docs/tour/03-functions" class="sidebar-link"> Functions </a><a href="/docs/tour/04-pattern-matching" class="sidebar-link"> Pattern Matching </a><a href="/docs/tour/05-algebraic-types" class="sidebar-link"> Algebraic Types </a><a href="/docs/tour/06-error-handling" class="sidebar-link"> Error Handling </a><a href="/docs/tour/07-ownership" class="sidebar-link"> Ownership </a><a href="/docs/tour/08-processes" class="sidebar-link"> Processes </a><a href="/docs/tour/09-modules" class="sidebar-link"> Modules </a><a href="/docs/tour/10-traits" class="sidebar-link"> Traits </a> </div><div class="sidebar-section"> <div class="sidebar-section-title">Guide</div> <a href="/docs/guide/getting-started" class="sidebar-link"> Getting Started </a><a href="/docs/guide/type-system" class="sidebar-link"> Type System </a><a href="/docs/guide/concurrency" class="sidebar-link"> Concurrency </a> </div><div class="sidebar-section"> <div class="sidebar-section-title">Reference</div> <a href="/docs/reference/syntax" class="sidebar-link"> Syntax </a><a href="/docs/reference/compiler" class="sidebar-link"> Compiler </a> </div> </aside> <main class="docs-content"> <nav class="breadcrumbs" aria-label="Breadcrumb"> <a href="/">Home</a> <span class="separator">/</span> <a href="/docs/tour/01-values">Docs</a>  <span class="separator">/</span> <a href="/docs/reference">Reference</a>  <span class="separator">/</span> <span>Grammar</span> </nav> <div class="doc-header"> <h1> Grammar <span class="status-badge stable">stable</span> </h1> <p class="description">Complete EBNF grammar reference for the JAPL programming language.</p> </div> <article class="doc-body">  <h1 id="grammar">Grammar</h1>
+<p>This page presents the complete EBNF grammar for JAPL. The grammar uses the following conventions: <code>{ X }</code> means zero or more <code>X</code>; <code>[ X ]</code> means optional <code>X</code>; <code>( X | Y )</code> means alternative; literal tokens are in double quotes.</p>
+<hr/>
+<h2 id="top-level-program">Top-Level Program</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>program         ::= { top_decl }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>top_decl        ::= module_decl</span></span>
+<span class="line"><span>                   | import_decl</span></span>
+<span class="line"><span>                   | type_decl</span></span>
+<span class="line"><span>                   | fn_decl</span></span>
+<span class="line"><span>                   | trait_decl</span></span>
+<span class="line"><span>                   | impl_decl</span></span>
+<span class="line"><span>                   | signature_decl</span></span>
+<span class="line"><span>                   | supervisor_decl</span></span>
+<span class="line"><span>                   | test_decl</span></span>
+<span class="line"><span>                   | property_decl</span></span>
+<span class="line"><span>                   | bench_decl</span></span>
+<span class="line"><span>                   | foreign_decl</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr/>
+<h2 id="module-declarations">Module Declarations</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>module_decl     ::= &quot;module&quot; module_path [ &quot;:&quot; signature_ref ] &quot;=&quot; module_body</span></span>
+<span class="line"><span>                   | &quot;module&quot; module_path</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>module_path     ::= TYPE_ID { &quot;.&quot; TYPE_ID }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>module_body     ::= INDENT { module_item } DEDENT</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>module_item     ::= type_decl | fn_decl | trait_decl | impl_decl</span></span>
+<span class="line"><span>                   | module_decl | signature_decl</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr/>
+<h2 id="import-declarations">Import Declarations</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>import_decl     ::= &quot;import&quot; module_path [ import_spec ]</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>import_spec     ::= &quot;.&quot; &quot;{&quot; import_item { &quot;,&quot; import_item } &quot;}&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>import_item     ::= IDENT | TYPE_ID</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr/>
+<h2 id="type-declarations">Type Declarations</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>type_decl       ::= &quot;type&quot; TYPE_ID [ type_params ] [ deriving_clause ] &quot;=&quot; type_body</span></span>
+<span class="line"><span>                   | &quot;type&quot; &quot;alias&quot; TYPE_ID [ type_params ] &quot;=&quot; type_expr</span></span>
+<span class="line"><span>                   | &quot;opaque&quot; &quot;type&quot; TYPE_ID [ type_params ]</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>type_params     ::= &quot;[&quot; type_var { &quot;,&quot; type_var } &quot;]&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>type_var        ::= IDENT</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>type_body       ::= sum_type | record_type</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>sum_type        ::= &quot;|&quot; constructor { &quot;|&quot; constructor }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>constructor     ::= TYPE_ID [ &quot;(&quot; type_expr { &quot;,&quot; type_expr } &quot;)&quot; ]</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>record_type     ::= &quot;{&quot; field_decl { &quot;,&quot; field_decl } &quot;}&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>field_decl      ::= IDENT &quot;:&quot; type_expr</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>deriving_clause ::= &quot;deriving&quot; &quot;(&quot; TYPE_ID { &quot;,&quot; TYPE_ID } &quot;)&quot;</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr/>
+<h2 id="function-declarations">Function Declarations</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>fn_decl         ::= &quot;fn&quot; IDENT [ type_params ] &quot;(&quot; [ param_list ] &quot;)&quot;</span></span>
+<span class="line"><span>                     &quot;-&gt;&quot; type_expr [ effect_clause ] [ where_clause ]</span></span>
+<span class="line"><span>                     &quot;=&quot; expr</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>param_list      ::= param { &quot;,&quot; param }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>param           ::= [ ownership_qual ] IDENT [ &quot;:&quot; type_expr ]</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>ownership_qual  ::= &quot;own&quot; | &quot;ref&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>effect_clause   ::= &quot;with&quot; effect { &quot;,&quot; effect }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>effect          ::= &quot;Pure&quot; | &quot;Io&quot; | &quot;Async&quot; | &quot;Net&quot;</span></span>
+<span class="line"><span>                   | &quot;State&quot; &quot;[&quot; type_expr &quot;]&quot;</span></span>
+<span class="line"><span>                   | &quot;Process&quot; [ &quot;[&quot; type_expr &quot;]&quot; ]</span></span>
+<span class="line"><span>                   | &quot;Fail&quot; &quot;[&quot; type_expr &quot;]&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>where_clause    ::= &quot;where&quot; constraint { &quot;,&quot; constraint }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>constraint      ::= TYPE_ID &quot;[&quot; type_expr { &quot;,&quot; type_expr } &quot;]&quot;</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr/>
+<h2 id="expressions">Expressions</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>expr            ::= let_expr</span></span>
+<span class="line"><span>                   | use_expr</span></span>
+<span class="line"><span>                   | match_expr</span></span>
+<span class="line"><span>                   | if_expr</span></span>
+<span class="line"><span>                   | fn_expr</span></span>
+<span class="line"><span>                   | loop_expr</span></span>
+<span class="line"><span>                   | pipe_expr</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>let_expr        ::= &quot;let&quot; pattern &quot;=&quot; expr NEWLINE expr</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>use_expr        ::= &quot;use&quot; IDENT &quot;=&quot; expr NEWLINE expr</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>match_expr      ::= &quot;match&quot; expr &quot;with&quot; NEWLINE { match_arm }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>match_arm       ::= &quot;|&quot; pattern [ guard ] &quot;-&gt;&quot; expr NEWLINE</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>guard           ::= &quot;if&quot; expr</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>if_expr         ::= &quot;if&quot; expr &quot;then&quot; expr &quot;else&quot; expr</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>fn_expr         ::= &quot;fn&quot; [ IDENT ] [ &quot;(&quot; [ param_list ] &quot;)&quot; ] &quot;-&gt;&quot; expr</span></span>
+<span class="line"><span>                   | &quot;fn&quot; IDENT &quot;-&gt;&quot; expr</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>loop_expr       ::= &quot;loop&quot; loop_bindings &quot;while&quot; expr &quot;do&quot; expr</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>loop_bindings   ::= loop_binding { &quot;,&quot; loop_binding }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>loop_binding    ::= IDENT &quot;=&quot; expr</span></span>
+<span class="line"><span></span></span></code></pre>
+<h3 id="operator-precedence-expressions">Operator Precedence (Expressions)</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>pipe_expr       ::= unary_expr { &quot;|&gt;&quot; unary_expr }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>unary_expr      ::= compose_expr { &quot;&gt;&gt;&quot; compose_expr }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>compose_expr    ::= or_expr</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>or_expr         ::= and_expr { &quot;||&quot; and_expr }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>and_expr        ::= cmp_expr { &quot;&amp;&amp;&quot; cmp_expr }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>cmp_expr        ::= add_expr [ cmp_op add_expr ]</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>cmp_op          ::= &quot;==&quot; | &quot;!=&quot; | &quot;&lt;&quot; | &quot;&gt;&quot; | &quot;&lt;=&quot; | &quot;&gt;=&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>add_expr        ::= mul_expr { (&quot;+&quot; | &quot;-&quot; | &quot;++&quot; | &quot;&lt;&gt;&quot;) mul_expr }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>mul_expr        ::= postfix_expr { (&quot;*&quot; | &quot;/&quot; | &quot;%&quot;) postfix_expr }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>postfix_expr    ::= primary_expr { &quot;?&quot; | &quot;.&quot; IDENT | &quot;(&quot; [ arg_list ] &quot;)&quot; }</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>arg_list        ::= expr { &quot;,&quot; expr }</span></span>
+<span class="line"><span></span></span></code></pre>
+<h3 id="primary-expressions">Primary Expressions</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>primary_expr    ::= IDENT</span></span>
+<span class="line"><span>                   | TYPE_ID [ &quot;(&quot; [ arg_list ] &quot;)&quot; ]</span></span>
+<span class="line"><span>                   | int_literal | float_literal | string_literal</span></span>
+<span class="line"><span>                   | &quot;True&quot; | &quot;False&quot;</span></span>
+<span class="line"><span>                   | &quot;()&quot;</span></span>
+<span class="line"><span>                   | &quot;(&quot; expr &quot;)&quot;</span></span>
+<span class="line"><span>                   | list_expr</span></span>
+<span class="line"><span>                   | record_expr</span></span>
+<span class="line"><span>                   | record_update</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>list_expr       ::= &quot;[&quot; [ expr { &quot;,&quot; expr } [ &quot;,&quot; &quot;..&quot; expr ] ] &quot;]&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>record_expr     ::= &quot;{&quot; field_assign { &quot;,&quot; field_assign } &quot;}&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>field_assign    ::= IDENT &quot;=&quot; expr</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>record_update   ::= &quot;{&quot; expr &quot;|&quot; field_assign { &quot;,&quot; field_assign } &quot;}&quot;</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr/>
+<h2 id="patterns">Patterns</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>pattern         ::= constructor_pat</span></span>
+<span class="line"><span>                   | record_pat</span></span>
+<span class="line"><span>                   | literal_pat</span></span>
+<span class="line"><span>                   | wildcard_pat</span></span>
+<span class="line"><span>                   | var_pat</span></span>
+<span class="line"><span>                   | list_pat</span></span>
+<span class="line"><span>                   | pinned_pat</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>constructor_pat ::= TYPE_ID [ &quot;(&quot; pattern { &quot;,&quot; pattern } &quot;)&quot; ]</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>record_pat      ::= &quot;{&quot; field_pat { &quot;,&quot; field_pat } &quot;}&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>field_pat       ::= IDENT [ &quot;=&quot; pattern ]</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>literal_pat     ::= int_literal | float_literal | string_literal</span></span>
+<span class="line"><span>                   | &quot;True&quot; | &quot;False&quot; | &quot;()&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>wildcard_pat    ::= &quot;_&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>var_pat         ::= IDENT</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>list_pat        ::= &quot;[&quot; [ pattern { &quot;,&quot; pattern } [ &quot;,&quot; &quot;..&quot; pattern ] ] &quot;]&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>pinned_pat      ::= &quot;^&quot; IDENT</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr/>
+<h2 id="type-expressions">Type Expressions</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>type_expr       ::= fn_type</span></span>
+<span class="line"><span>                   | simple_type</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>fn_type         ::= &quot;fn&quot; &quot;(&quot; [ type_expr { &quot;,&quot; type_expr } ] &quot;)&quot;</span></span>
+<span class="line"><span>                     &quot;-&gt;&quot; type_expr [ effect_clause ]</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>simple_type     ::= named_type</span></span>
+<span class="line"><span>                   | record_type_expr</span></span>
+<span class="line"><span>                   | type_var</span></span>
+<span class="line"><span>                   | &quot;(&quot; type_expr &quot;)&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>named_type      ::= TYPE_ID [ &quot;[&quot; type_expr { &quot;,&quot; type_expr } &quot;]&quot; ]</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>record_type_expr ::= &quot;{&quot; field_type { &quot;,&quot; field_type } [ &quot;|&quot; type_var ] &quot;}&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>field_type      ::= IDENT &quot;:&quot; type_expr</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr/>
+<h2 id="trait-declarations">Trait Declarations</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>trait_decl      ::= &quot;trait&quot; TYPE_ID &quot;[&quot; type_var { &quot;,&quot; type_var } &quot;]&quot;</span></span>
+<span class="line"><span>                     [ &quot;where&quot; constraint { &quot;,&quot; constraint } ]</span></span>
+<span class="line"><span>                     &quot;=&quot; INDENT { trait_member } DEDENT</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>trait_member    ::= fn_signature</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>fn_signature    ::= &quot;fn&quot; IDENT &quot;(&quot; [ param_list ] &quot;)&quot; &quot;-&gt;&quot; type_expr</span></span>
+<span class="line"><span>                     [ effect_clause ]</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr/>
+<h2 id="impl-declarations">Impl Declarations</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>impl_decl       ::= &quot;impl&quot; TYPE_ID &quot;[&quot; type_expr { &quot;,&quot; type_expr } &quot;]&quot;</span></span>
+<span class="line"><span>                     &quot;=&quot; INDENT { fn_decl } DEDENT</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr/>
+<h2 id="signature-declarations">Signature Declarations</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>signature_decl  ::= &quot;signature&quot; TYPE_ID [ type_params ]</span></span>
+<span class="line"><span>                     &quot;=&quot; INDENT { sig_member } DEDENT</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>sig_member      ::= &quot;type&quot; TYPE_ID</span></span>
+<span class="line"><span>                   | fn_signature</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr/>
+<h2 id="supervisor-declarations">Supervisor Declarations</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>supervisor_decl ::= &quot;supervisor&quot; IDENT &quot;=&quot; INDENT supervisor_body DEDENT</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>supervisor_body ::= &quot;strategy&quot; &quot;=&quot; strategy_expr NEWLINE</span></span>
+<span class="line"><span>                     &quot;max_restarts&quot; &quot;=&quot; int_literal NEWLINE</span></span>
+<span class="line"><span>                     &quot;max_seconds&quot; &quot;=&quot; int_literal NEWLINE</span></span>
+<span class="line"><span>                     &quot;children&quot; &quot;=&quot; &quot;[&quot; { child_spec &quot;,&quot; } &quot;]&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>strategy_expr   ::= &quot;OneForOne&quot; | &quot;AllForOne&quot; | &quot;RestForOne&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>child_spec      ::= &quot;{&quot; &quot;id&quot; &quot;=&quot; string_literal &quot;,&quot;</span></span>
+<span class="line"><span>                         &quot;start&quot; &quot;=&quot; expr &quot;,&quot;</span></span>
+<span class="line"><span>                         &quot;restart&quot; &quot;=&quot; restart_type &quot;,&quot;</span></span>
+<span class="line"><span>                         &quot;shutdown&quot; &quot;=&quot; shutdown_expr &quot;}&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>restart_type    ::= &quot;Permanent&quot; | &quot;Transient&quot; | &quot;Temporary&quot;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>shutdown_expr   ::= &quot;Timeout&quot; &quot;(&quot; int_literal &quot;)&quot; | &quot;Brutal&quot;</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr/>
+<h2 id="test-property-and-bench-declarations">Test, Property, and Bench Declarations</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>test_decl       ::= &quot;test&quot; string_literal &quot;=&quot; expr</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>property_decl   ::= &quot;property&quot; string_literal &quot;=&quot;</span></span>
+<span class="line"><span>                     &quot;forall&quot; &quot;(&quot; param_list &quot;)&quot; &quot;-&gt;&quot; expr</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>bench_decl      ::= &quot;bench&quot; string_literal &quot;=&quot; expr</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr/>
+<h2 id="foreign-declarations">Foreign Declarations</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>foreign_decl    ::= &quot;foreign&quot; string_literal &quot;fn&quot; IDENT</span></span>
+<span class="line"><span>                     &quot;(&quot; [ param_list ] &quot;)&quot; &quot;-&gt;&quot; type_expr</span></span>
+<span class="line"><span>                   | &quot;foreign&quot; string_literal &quot;module&quot; string_literal</span></span>
+<span class="line"><span>                     &quot;=&quot; INDENT { foreign_fn } DEDENT</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>foreign_fn      ::= &quot;fn&quot; IDENT &quot;(&quot; [ param_list ] &quot;)&quot; &quot;-&gt;&quot; type_expr</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr/>
+<h2 id="lexical-grammar">Lexical Grammar</h2>
+<h3 id="identifiers">Identifiers</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>identifier      ::= lower_start (alpha | digit | &#39;_&#39;)*</span></span>
+<span class="line"><span>type_identifier ::= upper_start (alpha | digit | &#39;_&#39;)*</span></span>
+<span class="line"><span>lower_start     ::= &#39;a&#39; .. &#39;z&#39; | &#39;_&#39;</span></span>
+<span class="line"><span>upper_start     ::= &#39;A&#39; .. &#39;Z&#39;</span></span>
+<span class="line"><span></span></span></code></pre>
+<h3 id="integer-literals">Integer Literals</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>int_literal     ::= decimal | hexadecimal | octal | binary</span></span>
+<span class="line"><span>decimal         ::= digit (digit | &#39;_&#39;)*</span></span>
+<span class="line"><span>hexadecimal     ::= &#39;0x&#39; hex_digit (hex_digit | &#39;_&#39;)*</span></span>
+<span class="line"><span>octal           ::= &#39;0o&#39; oct_digit (oct_digit | &#39;_&#39;)*</span></span>
+<span class="line"><span>binary          ::= &#39;0b&#39; bin_digit (bin_digit | &#39;_&#39;)*</span></span>
+<span class="line"><span></span></span></code></pre>
+<h3 id="float-literals">Float Literals</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>float_literal   ::= digit+ &#39;.&#39; digit+ exponent?</span></span>
+<span class="line"><span>exponent        ::= (&#39;e&#39; | &#39;E&#39;) (&#39;+&#39; | &#39;-&#39;)? digit+</span></span>
+<span class="line"><span></span></span></code></pre>
+<h3 id="string-literals">String Literals</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>string_literal  ::= &#39;&quot;&#39; string_char* &#39;&quot;&#39;</span></span>
+<span class="line"><span>string_char     ::= &lt;any UTF-8 char except &#39;&quot;&#39; and &#39;\&#39;&gt;</span></span>
+<span class="line"><span>                   | escape_sequence</span></span>
+<span class="line"><span>escape_sequence ::= &#39;\\&#39; | &#39;\&quot;&#39; | &#39;\n&#39; | &#39;\t&#39; | &#39;\r&#39; | &#39;\0&#39;</span></span>
+<span class="line"><span>                   | &#39;\u{&#39; hex_digit+ &#39;}&#39;</span></span>
+<span class="line"><span></span></span></code></pre>
+<h3 id="comments">Comments</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="text"><code><span class="line"><span>line_comment    ::= &#39;--&#39; &lt;any char&gt;* NEWLINE</span></span>
+<span class="line"><span>doc_comment     ::= &#39;---&#39; &lt;any char&gt;* NEWLINE</span></span>
+<span class="line"><span></span></span></code></pre>  </article> <div class="prev-next"><a href="/reference/01-spec" class="prev-next-link"><span class="prev-next-label">Previous</span><span class="prev-next-title">Language Specification</span></a><a href="/reference/03-cli" class="prev-next-link next"><span class="prev-next-label">Next</span><span class="prev-next-title">CLI Reference</span></a></div> <a href="https://github.com/YonedaAI/japl/edit/main/docs/reference/02-grammar.mdx" class="edit-link" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+Edit this page on GitHub
+</a> </main> </div> <footer class="footer" data-astro-cid-sz7xmlte> <div class="footer-inner container" data-astro-cid-sz7xmlte> <div class="footer-brand" data-astro-cid-sz7xmlte> <span class="footer-logo" data-astro-cid-sz7xmlte><span class="footer-logo-accent" data-astro-cid-sz7xmlte>J</span>APL</span> <p class="footer-tagline" data-astro-cid-sz7xmlte>Strict typed functional programming.<br data-astro-cid-sz7xmlte>Rust ownership. Erlang processes. Go simplicity.</p> </div> <div class="footer-links" data-astro-cid-sz7xmlte> <div class="footer-col" data-astro-cid-sz7xmlte> <h4 data-astro-cid-sz7xmlte>Learn</h4> <a href="/docs/tour/01-values" data-astro-cid-sz7xmlte>Language Tour</a> <a href="/docs/guide" data-astro-cid-sz7xmlte>Guide</a> <a href="/docs/reference" data-astro-cid-sz7xmlte>Reference</a> </div> <div class="footer-col" data-astro-cid-sz7xmlte> <h4 data-astro-cid-sz7xmlte>Community</h4> <a href="https://github.com/YonedaAI/japl" target="_blank" rel="noopener" data-astro-cid-sz7xmlte>GitHub</a> <a href="https://github.com/YonedaAI/japl/issues" target="_blank" rel="noopener" data-astro-cid-sz7xmlte>Issues</a> </div> </div> <div class="footer-bottom" data-astro-cid-sz7xmlte> <p data-astro-cid-sz7xmlte>Built by <a href="https://yonedaai.com" target="_blank" rel="noopener" data-astro-cid-sz7xmlte>YonedaAI</a></p> </div> </div> </footer>   </body></html>

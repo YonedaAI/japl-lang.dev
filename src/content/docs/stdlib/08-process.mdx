@@ -1,0 +1,122 @@
+---
+title: "Process"
+description: "Reference for the Process standard library module providing lightweight process operations."
+status: "preview"
+order: 8
+section: "stdlib"
+prev: { title: "IO", slug: "stdlib/07-io" }
+next: { title: "Test", slug: "stdlib/09-test" }
+---
+
+# Process
+
+The `Process` module provides operations for JAPL's lightweight process system. Processes are isolated, share no mutable memory, and communicate only through typed message passing.
+
+> **Status: Preview.** The Process module is currently a stub. The full process runtime with message passing, supervision, and distribution is under active development.
+
+---
+
+## sleep_ms
+
+```japl
+fn sleep_ms(ms: Int) -> Unit
+```
+
+Pauses the current process for the specified number of milliseconds. Currently implemented as a logging stub that prints the sleep duration.
+
+### Example
+
+```japl
+Process.sleep_ms(1000)
+-- prints: sleeping 1000ms
+```
+
+---
+
+## Planned API
+
+The following functions are defined in the language specification and will be implemented as the runtime matures. They are documented here for reference.
+
+### spawn
+
+```japl
+fn spawn(f: fn() -> Never) -> Pid[Msg]
+```
+
+Creates a new lightweight process that executes the given function. Returns a typed process identifier.
+
+```japl
+let pid = Process.spawn(fn() { counter_loop(0) })
+```
+
+### send
+
+```japl
+fn send(pid: Pid[Msg], message: Msg) -> Unit
+```
+
+Sends a message to the mailbox of the process identified by `pid`. Send is asynchronous and non-blocking.
+
+```japl
+Process.send(pid, Increment)
+```
+
+### receive
+
+```japl
+fn receive() -> Msg
+```
+
+Blocks until a message is available in the current process's mailbox and returns it.
+
+```japl
+let msg = Process.receive()
+match msg {
+  Increment => counter_loop(count + 1)
+  GetCount(reply) => Reply.send(reply, count)
+}
+```
+
+### receive_with_timeout
+
+```japl
+fn receive_with_timeout(ms: Int) -> Option[Msg]
+```
+
+Waits for a message for up to `ms` milliseconds. Returns `Some(msg)` if a message arrives, `None` if the timeout expires.
+
+### link
+
+```japl
+fn link(pid: Pid[Msg]) -> Unit
+```
+
+Creates a bidirectional link between the current process and the specified process. If either process crashes, the other receives an exit signal.
+
+### monitor
+
+```japl
+fn monitor(pid: Pid[Msg]) -> Ref
+```
+
+Creates a unidirectional monitor. The current process receives a `ProcessDown` message when the monitored process exits.
+
+### spawn_on
+
+```japl
+fn spawn_on(node: Node, f: fn() -> Never) -> Pid[Msg]
+```
+
+Creates a process on a remote node. The function and its captured environment must be serializable. The returned PID is location-transparent.
+
+### exit
+
+```japl
+fn exit(reason: CrashReason) -> Never
+```
+
+Terminates the current process with the given reason.
+
+```japl
+Process.exit(Normal)
+```

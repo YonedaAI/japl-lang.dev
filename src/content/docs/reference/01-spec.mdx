@@ -1,0 +1,367 @@
+---
+title: "Language Specification"
+description: "Overview of the JAPL language specification covering lexical structure, type system, expression semantics, and evaluation strategy."
+status: "stable"
+order: 1
+section: "reference"
+next: { title: "Grammar", slug: "reference/02-grammar" }
+---
+
+# Language Specification
+
+This page provides a navigable overview of the JAPL language specification (v1.0-draft). JAPL is a strict, typed, effect-aware functional programming language combining Rust's ownership model, Go's simplicity, Erlang/OTP's lightweight processes, and the functional programming tradition's immutable values, algebraic data types, pattern matching, and effect tracking.
+
+---
+
+## Lexical Structure
+
+### Source Encoding
+
+All JAPL source files are UTF-8 encoded. The file extension is `.japl`.
+
+### Comments
+
+JAPL supports line comments only. There are no block comments.
+
+```japl
+-- This is a line comment
+--- This is a doc comment
+```
+
+### Whitespace and Layout
+
+JAPL is indentation-aware. Blocks are delimited by indentation rather than braces. Semicolons are not used. Newlines are significant as statement terminators within blocks.
+
+### Keywords
+
+The following identifiers are reserved:
+
+```text
+assert    bench     continue  deriving  do        else
+fn        forall    foreign   if        impl      import
+let       loop      match     module    opaque    own
+packed    property  ref       receive   send      signature
+spawn     strategy  supervisor test     then      trait
+type      unsafe    use       where     while     with
+```
+
+### Identifiers
+
+Value-level identifiers (variables, function names, field names) begin with a lowercase letter or underscore. Type-level identifiers (type names, constructors, module names) begin with an uppercase letter.
+
+```japl
+let my_value = 42        -- lowercase identifier
+type MyType = Some(Int)  -- uppercase identifier
+```
+
+### Literals
+
+JAPL supports the following literal forms:
+
+| Literal | Examples | Description |
+|---------|----------|-------------|
+| Integer | `42`, `0xFF`, `0b1010`, `0o77` | Arbitrary precision, underscores allowed (`1_000_000`) |
+| Float | `3.14`, `1.0e10` | 64-bit IEEE 754 double precision |
+| String | `"hello"` | Immutable UTF-8 strings |
+| Char | `'a'`, `'\n'` | Unicode scalar values |
+| Bool | `True`, `False` | Boolean literals |
+| Unit | `()` | The unit value |
+| List | `[1, 2, 3]`, `[]` | List literals with spread support (`[1, ..rest]`) |
+
+### Operators
+
+#### Arithmetic and Comparison
+
+| Operator | Meaning | Precedence |
+|----------|---------|------------|
+| `*`, `/`, `%` | Multiplication, division, modulo | 7 |
+| `+`, `-` | Addition, subtraction | 6 |
+| `++`, `<>` | String/list concat, semigroup append | 6 |
+| `<`, `>`, `<=`, `>=` | Comparison | 5 |
+| `==`, `!=` | Structural equality | 4 |
+| `&&` | Logical AND (short-circuit) | 3 |
+| `\|\|` | Logical OR (short-circuit) | 2 |
+| `\|>`, `>>` | Pipe, forward composition | 1 |
+
+#### Special Operators
+
+| Operator | Meaning |
+|----------|---------|
+| `?` | Error propagation (postfix) |
+| `\|` | Record update / variant separator |
+| `->` | Function arrow / match arm arrow |
+| `=>` | Fat arrow (match bodies) |
+| `.` | Field access / module path |
+| `..` | Spread operator |
+| `!` | Logical NOT (prefix) |
+
+---
+
+## Type System
+
+JAPL has a static, strong, parametrically polymorphic type system with bidirectional local type inference, algebraic data types, row polymorphism, traits, effect types, and linear resource types.
+
+### Primitive Types
+
+| Type | Description |
+|------|-------------|
+| `Int` | Arbitrary-precision integer |
+| `Float` | 64-bit IEEE 754 double precision |
+| `Float32` | 32-bit IEEE 754 single precision |
+| `Bool` | `True` or `False` |
+| `Char` | Unicode scalar value |
+| `String` | Immutable UTF-8 string |
+| `Bytes` | Immutable raw byte sequence |
+| `Unit` | The unit type; sole value `()` |
+| `Never` | The bottom type; no values |
+
+### Algebraic Data Types
+
+Sum types define a closed set of variants:
+
+```japl
+type Shape =
+  | Circle(Float)
+  | Rectangle(Float, Float)
+
+type Option[a] =
+  | Some(a)
+  | None
+```
+
+Product types (records) are structurally typed:
+
+```japl
+type User = {
+  id: Int,
+  name: String,
+  email: String,
+}
+```
+
+### Parametric Polymorphism
+
+Type variables are lowercase identifiers, implicitly universally quantified at the function level:
+
+```japl
+fn identity(x: a) -> a { x }
+fn map(list: List(a), f: fn(a) -> b) -> List(b) { ... }
+```
+
+### Type Inference
+
+JAPL uses bidirectional type checking with local inference. Top-level function signatures are required at module boundaries. Within function bodies, types are inferred.
+
+### Row Polymorphism
+
+Records support row polymorphism via row variables:
+
+```japl
+fn get_name(r: { name: String | rest }) -> String {
+  r.name
+}
+```
+
+This function accepts any record that has at least a `name: String` field.
+
+### Traits
+
+Traits define function interfaces that types must implement:
+
+```japl
+trait Eq[a] =
+  fn eq(x: a, y: a) -> Bool
+
+trait Show[a] =
+  fn show(value: a) -> String
+```
+
+Implementations use `impl`, and `deriving` auto-generates implementations:
+
+```japl
+type Point deriving(Eq, Show) = { x: Float, y: Float }
+```
+
+### Effect Types
+
+Effects track computational side effects in function signatures:
+
+| Effect | Meaning |
+|--------|---------|
+| `Pure` | No effects (the default) |
+| `Io` | File system, console, clock, random |
+| `Async` | Asynchronous operations |
+| `Net` | Network access |
+| `State[s]` | Local mutable state of type `s` |
+| `Process[m]` | Process operations with mailbox type `m` |
+| `Fail[e]` | May fail with error type `e` |
+
+Effects are declared with the `with` keyword:
+
+```japl
+fn read_config(path: String) -> Config with Io, Fail[ConfigError] {
+  let text = File.read_to_string(path)?
+  parse_config(text)?
+}
+```
+
+---
+
+## Expression Semantics
+
+### Evaluation Strategy
+
+JAPL uses **strict (eager) evaluation** with **left-to-right** evaluation order. All arguments to a function are fully evaluated before the function body executes. Lazy evaluation is available explicitly via thunks (`fn() -> expr`).
+
+### Let Binding
+
+```japl
+let x = expr1
+expr2
+```
+
+Evaluates `expr1`, binds the result to `x`, then evaluates `expr2`. Bindings are irrevocable -- `x` cannot be reassigned.
+
+### Pattern Matching
+
+```japl
+match expr {
+  Pattern1 => body1
+  Pattern2 => body2
+  _ => default_body
+}
+```
+
+The compiler requires exhaustive coverage of all possible values. Pattern forms include constructors, records, lists, literals, wildcards, variable bindings, and pinned variables (`^x`).
+
+### Pipe Operator
+
+The pipe operator passes the left-hand expression as the first argument to the right-hand function:
+
+```japl
+raw_data
+  |> parse_csv
+  |> List.filter(fn(row) { row.amount > 0 })
+  |> List.map(to_transaction)
+```
+
+### Forward Composition
+
+```japl
+let process = validate >> transform >> store
+```
+
+`f >> g` produces a new function equivalent to `fn(x) { g(f(x)) }`.
+
+---
+
+## Ownership and Linearity
+
+JAPL employs a dual-layer memory model: a **pure layer** for immutable values (garbage collected, freely shared) and a **resource layer** for mutable resources (ownership-tracked, linear).
+
+| Layer | Mutability | Memory | Sharing | Typing |
+|-------|-----------|--------|---------|--------|
+| Pure | Immutable | GC (per-process) | Free | Unrestricted |
+| Resource | Mutable | Ownership-tracked | Single owner | Linear |
+
+Resources use `own` for ownership transfer and `ref` for borrowing:
+
+```japl
+fn send_to_worker(buf: own Buffer, pid: Pid[WorkerMsg]) -> Unit {
+  Process.send(pid, ProcessBuffer(buf))
+}
+
+fn peek(buf: ref Buffer) -> Byte {
+  Buffer.get(buf, 0)
+}
+```
+
+The `use` keyword introduces a linear binding that must be consumed exactly once.
+
+---
+
+## Process Semantics
+
+JAPL uses Erlang-style lightweight processes as the sole concurrency primitive. Processes are isolated, share no mutable memory, and communicate only through typed message passing.
+
+```japl
+let pid = Process.spawn(fn() { counter(0) })
+Process.send(pid, Increment)
+```
+
+Each process has a typed mailbox. The type system prevents sending messages of the wrong type. Process state is managed through tail-recursive loops.
+
+---
+
+## Supervision
+
+Supervision trees are built into the language. A supervisor monitors child processes and restarts them according to a declared strategy.
+
+| Strategy | Behavior |
+|----------|----------|
+| `OneForOne` | Only the crashed child is restarted |
+| `AllForOne` | All children restarted when one crashes |
+| `RestForOne` | Crashed child and all children started after it are restarted |
+
+---
+
+## Error Handling
+
+JAPL provides a dual error model:
+
+- **Domain errors** use `Result[a, e]` and the `?` operator for expected, recoverable failures.
+- **Process failures** use crash-and-restart for unexpected conditions. The supervisor detects the crash and applies the configured restart strategy.
+
+```japl
+-- Domain error with ?
+fn get_user(id: UserId) -> Result[User, AppError] with Io {
+  let row = Db.query_one(sql, [id])?
+  Ok(to_user(row))
+}
+
+-- Process failure with assert
+assert valid_invariant(state)
+```
+
+---
+
+## Module System
+
+Modules are named collections of types, functions, and sub-modules. They serve as namespaces, compilation units, and encapsulation boundaries.
+
+```japl
+module Http.Server
+
+import Http.{Request, Response}
+```
+
+Modules support opaque types for encapsulation and signatures for defining module interfaces.
+
+---
+
+## Distribution
+
+JAPL treats distribution as a first-class concern. Process identifiers are location-transparent, working identically for local and remote processes. Type-derived serialization enables safe message passing across node boundaries.
+
+---
+
+## FFI
+
+JAPL provides a Foreign Function Interface to C, Rust, and WASM. All FFI calls require the `unsafe` keyword and the `Io` effect. Foreign resources should be wrapped in safe JAPL interfaces.
+
+---
+
+## Built-in Test Framework
+
+Testing is a first-class language feature with `test` blocks, `assert` expressions, property-based testing via `forall`, and benchmark blocks via `bench`.
+
+```japl
+test "parsing a valid integer" {
+  assert parse_int("42") == Ok(42)
+}
+
+property "reverse twice is identity" {
+  forall (xs: List(Int)) ->
+    List.reverse(List.reverse(xs)) == xs
+}
+```

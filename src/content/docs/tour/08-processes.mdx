@@ -1,0 +1,148 @@
+---
+title: "Processes"
+description: "Learn how JAPL's lightweight processes enable concurrent programming with message passing."
+status: "stable"
+order: 8
+section: "tour"
+prev: { title: "Effects", slug: "docs/tour/07-effects" }
+next: { title: "Supervision", slug: "docs/tour/09-supervision" }
+---
+
+# Processes
+
+JAPL's concurrency model is built on lightweight processes that communicate through message passing. There are no threads, no locks, and no shared mutable state. Each process has its own isolated memory and a typed mailbox. You can run thousands to millions of processes on a single machine.
+
+## Spawning a Process
+
+Use `spawn` to create a new process. It takes a function and runs it concurrently:
+
+```japl
+fn main() {
+  let pid = spawn(fn() { println("Hello from a process!") })
+}
+```
+
+The `spawn` call returns a process identifier (`pid`) that you use to communicate with the new process.
+
+## Sending Messages
+
+Use `send` to deliver a message to a process's mailbox:
+
+```japl
+send(pid, Inc)
+send(pid, Get)
+```
+
+Sends are asynchronous -- they return immediately without waiting for the recipient to process the message. Messages are queued in the recipient's mailbox in the order they are sent.
+
+## Receiving Messages
+
+A process reads from its mailbox with `receive`, pattern matching on incoming messages:
+
+```japl
+type Msg =
+  | Inc
+  | Get
+
+fn counter(n: Int) {
+  receive {
+    Inc => counter(n + 1)
+    Get => println("Final: " <> show(n))
+  }
+}
+```
+
+The `receive` expression blocks until a matching message arrives. Each branch handles a different message type.
+
+## A Complete Example
+
+Here is a concurrent counter that processes a sequence of messages:
+
+```japl
+type Msg =
+  | Inc
+  | Get
+
+fn counter(n: Int) {
+  println("Counter value: " <> show(n))
+  receive {
+    Inc => counter(n + 1)
+    Get => println("Final: " <> show(n))
+  }
+}
+
+fn main() {
+  println("Starting concurrent counter...")
+  let pid = spawn(fn() { counter(0) })
+  send(pid, Inc)
+  send(pid, Inc)
+  send(pid, Inc)
+  send(pid, Get)
+  println("Messages sent.")
+}
+```
+
+The counter starts at 0, receives three `Inc` messages to reach 3, then receives `Get` to print the final value. Each recursive call to `counter` waits for the next message.
+
+## Process Isolation
+
+Each process has its own memory. There is no way for one process to read or modify another process's data directly. This isolation gives you several properties for free:
+
+- **No data races**: Without shared memory, there is nothing to race on.
+- **Independent failure**: If one process crashes, others keep running.
+- **Simple reasoning**: Each process is a sequential program. Concurrency comes from having many processes, not from interleaving within one.
+
+## Typed Messages
+
+JAPL's type system ensures that you only send messages a process can understand. The message type is defined as a sum type, and the compiler checks that sends and receives agree:
+
+```japl
+type WorkerMsg =
+  | DoWork(Task, Reply[TaskResult])
+  | Shutdown
+
+fn worker(state: WorkerState) -> Never with Process[WorkerMsg] =
+  match Process.receive() with
+  | DoWork(task, reply) ->
+      let result = execute_task(state, task)
+      Reply.send(reply, result)
+      worker(state)
+  | Shutdown ->
+      cleanup(state)
+      Process.exit(Normal)
+```
+
+The `Process[WorkerMsg]` annotation on the function specifies the mailbox type. Sending a message of the wrong type is a compile error.
+
+## Process State Through Recursion
+
+Processes maintain state through recursive calls. Each call to the process function carries the updated state as a parameter:
+
+```japl
+fn counter(n: Int) {
+  receive {
+    Inc => counter(n + 1)        -- state becomes n + 1
+    Get => println(show(n))      -- read the current state
+  }
+}
+```
+
+This is immutable state management -- the old value of `n` is never modified. Instead, the process loops with a new value. This pattern is simple, safe, and works naturally with JAPL's value semantics.
+
+## Linking Processes
+
+Processes can be linked so that a failure in one notifies the other:
+
+```japl
+fn tcp_acceptor(listener: TcpListener) -> Never with Process[AcceptorMsg], Io =
+  let conn = Tcp.accept(listener)
+  let pid = Process.spawn(fn -> handle_connection(conn))
+  Process.link(pid)
+  tcp_acceptor(listener)
+```
+
+When a linked process crashes, the linked partner receives a notification. This is the foundation for supervision, covered in the next chapter.
+
+## Next Steps
+
+Individual processes are useful, but real systems need to handle failure gracefully. Learn how in [Supervision](/docs/tour/09-supervision).

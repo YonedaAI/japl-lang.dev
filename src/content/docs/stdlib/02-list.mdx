@@ -1,0 +1,260 @@
+---
+title: "List"
+description: "Reference for the List standard library module providing functional operations on immutable linked lists."
+status: "stable"
+order: 2
+section: "stdlib"
+prev: { title: "Core", slug: "stdlib/01-core" }
+next: { title: "String", slug: "stdlib/03-string" }
+---
+
+# List
+
+The `List` module provides functional operations on JAPL's immutable singly-linked lists. Lists are the primary sequential collection type, supporting pattern matching with `[]`, `[head, ...tail]`, and literal syntax.
+
+```japl
+import List
+```
+
+---
+
+## map
+
+```japl
+fn map(list: List(a), f: fn(a) -> b) -> List(b)
+```
+
+Transforms each element of a list by applying a function, producing a new list of results. The original list is unchanged.
+
+### Example
+
+```japl
+[1, 2, 3] |> List.map(fn(x) { x * 2 })
+-- [2, 4, 6]
+
+["hello", "world"] |> List.map(string_length)
+-- [5, 5]
+```
+
+---
+
+## filter
+
+```japl
+fn filter(list: List(a), pred: fn(a) -> Bool) -> List(a)
+```
+
+Returns a new list containing only the elements for which the predicate returns `True`.
+
+### Example
+
+```japl
+[1, 2, 3, 4, 5] |> List.filter(fn(x) { x > 3 })
+-- [4, 5]
+
+["", "hello", "", "world"] |> List.filter(fn(s) { string_length(s) > 0 })
+-- ["hello", "world"]
+```
+
+---
+
+## fold
+
+```japl
+fn fold(list: List(a), init: b, f: fn(b, a) -> b) -> b
+```
+
+Reduces a list to a single value by applying a function to an accumulator and each element from left to right. Also known as `foldl` or `reduce`.
+
+### Example
+
+```japl
+[1, 2, 3, 4] |> List.fold(0, fn(acc, x) { acc + x })
+-- 10
+
+["a", "b", "c"] |> List.fold("", fn(acc, s) { acc <> s })
+-- "abc"
+```
+
+---
+
+## length
+
+```japl
+fn length(list: List(a)) -> Int
+```
+
+Returns the number of elements in the list.
+
+### Example
+
+```japl
+List.length([1, 2, 3])
+-- 3
+
+List.length([])
+-- 0
+```
+
+---
+
+## reverse
+
+```japl
+fn reverse(list: List(a)) -> List(a)
+```
+
+Returns a new list with the elements in reverse order.
+
+### Example
+
+```japl
+List.reverse([1, 2, 3])
+-- [3, 2, 1]
+
+List.reverse([])
+-- []
+```
+
+---
+
+## head
+
+```japl
+fn head(list: List(a)) -> Option(a)
+```
+
+Returns the first element of the list wrapped in `Some`, or `None` if the list is empty.
+
+### Example
+
+```japl
+List.head([1, 2, 3])
+-- Some(1)
+
+List.head([])
+-- None
+```
+
+---
+
+## tail
+
+```japl
+fn tail(list: List(a)) -> Option(List(a))
+```
+
+Returns the list without its first element wrapped in `Some`, or `None` if the list is empty.
+
+### Example
+
+```japl
+List.tail([1, 2, 3])
+-- Some([2, 3])
+
+List.tail([1])
+-- Some([])
+
+List.tail([])
+-- None
+```
+
+---
+
+## concat
+
+```japl
+fn concat(a: List(t), b: List(t)) -> List(t)
+```
+
+Concatenates two lists, producing a new list with all elements of `a` followed by all elements of `b`.
+
+### Example
+
+```japl
+List.concat([1, 2], [3, 4])
+-- [1, 2, 3, 4]
+
+List.concat([], [1, 2])
+-- [1, 2]
+```
+
+---
+
+## any
+
+```japl
+fn any(list: List(a), pred: fn(a) -> Bool) -> Bool
+```
+
+Returns `True` if any element in the list satisfies the predicate. Returns `False` for an empty list. Short-circuits on the first match.
+
+### Example
+
+```japl
+[1, 2, 3] |> List.any(fn(x) { x > 2 })
+-- True
+
+[1, 2, 3] |> List.any(fn(x) { x > 5 })
+-- False
+```
+
+---
+
+## all
+
+```japl
+fn all(list: List(a), pred: fn(a) -> Bool) -> Bool
+```
+
+Returns `True` if all elements in the list satisfy the predicate. Returns `True` for an empty list. Short-circuits on the first non-match.
+
+### Example
+
+```japl
+[2, 4, 6] |> List.all(fn(x) { x % 2 == 0 })
+-- True
+
+[2, 3, 6] |> List.all(fn(x) { x % 2 == 0 })
+-- False
+```
+
+---
+
+## find
+
+```japl
+fn find(list: List(a), pred: fn(a) -> Bool) -> Option(a)
+```
+
+Returns the first element that satisfies the predicate wrapped in `Some`, or `None` if no element matches.
+
+### Example
+
+```japl
+[1, 2, 3, 4] |> List.find(fn(x) { x > 2 })
+-- Some(3)
+
+[1, 2, 3] |> List.find(fn(x) { x > 5 })
+-- None
+```
+
+---
+
+## flat_map
+
+```japl
+fn flat_map(list: List(a), f: fn(a) -> List(b)) -> List(b)
+```
+
+Applies a function that returns a list to each element, then concatenates all resulting lists into a single list. Also known as `concatMap` or `bind`.
+
+### Example
+
+```japl
+[1, 2, 3] |> List.flat_map(fn(x) { [x, x * 10] })
+-- [1, 10, 2, 20, 3, 30]
+
+[[1, 2], [3, 4]] |> List.flat_map(Core.identity)
+-- [1, 2, 3, 4]
+```

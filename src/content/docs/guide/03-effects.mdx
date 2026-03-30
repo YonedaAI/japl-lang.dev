@@ -1,0 +1,237 @@
+---
+title: "Effect System"
+description: "Deep dive into JAPL's effect rows, effect tracking, handlers, and the algebra of computational effects."
+status: "preview"
+order: 3
+section: "guide"
+prev: { title: "Ownership & Linearity", slug: "guide/02-ownership" }
+next: { title: "Process Model", slug: "guide/04-processes" }
+---
+
+# Effect System
+
+Every function has side effects -- or it does not. In most languages, you cannot tell which from the signature. A function called `get_user` might read from a database, log to a file, send a network request, or simply look up a value in a map. You have to read the implementation to know.
+
+JAPL makes effects explicit. Every function signature declares which computational effects it performs. Pure functions have no annotation. Effectful functions list their effects after the `with` keyword. The compiler enforces these declarations: if you call an effectful function from a pure context, you get a type error.
+
+This is not about restricting what you can do -- it is about making what you do visible. When you see a function's type, you know exactly what it can and cannot do.
+
+## Effect Types
+
+JAPL tracks the following base effects:
+
+| Effect | Meaning |
+|--------|---------|
+| `Pure` | No effects (the default; not written) |
+| `Io` | File system, console, clock, random |
+| `Async` | Asynchronous operations |
+| `Net` | Network access |
+| `State[s]` | Local mutable state of type `s` |
+| `Process[m]` | Process operations with mailbox type `m` |
+| `Fail[e]` | May fail with error type `e` |
+
+```japl
+-- Pure function: no annotation needed
+fn add(a: Int, b: Int) -> Int =
+  a + b
+
+-- Effectful function: effects listed after `with`
+fn read_config(path: String) -> Config with Io, Fail[ConfigError] =
+  let text = File.read_to_string(path)?
+  parse_config(text)?
+```
+
+## Effect Algebra
+
+Effects in JAPL form a commutative, idempotent monoid. This sounds abstract, but the rules are intuitive:
+
+- **Identity:** `Pure` is the empty effect set. A pure function has no effects.
+- **Composition:** `with E1, E2` is the union of `E1` and `E2`. Effects accumulate.
+- **Commutativity:** `with Io, Net` is the same as `with Net, Io`. Order does not matter.
+- **Idempotency:** `with Io, Io` is the same as `with Io`. Duplicates are harmless.
+
+These properties mean you never have to worry about effect ordering or duplication. Effects simply compose.
+
+## Effect Hierarchy
+
+Effects have a subtyping relationship:
+
+```
+Pure < State[s] < Io
+Pure < Fail[e]
+Pure < Process < Async
+Pure < Net < Io
+```
+
+A function with effect set `E1` may call a function with effect set `E2` if and only if `E2` is a subset of `E1`. Put simply: an `Io` function can call `Net` functions (since `Net < Io`), but a `Pure` function cannot call an `Io` function.
+
+```japl
+-- This function has effects Io, Net, Fail[AppError]
+fn handler(req: Request) -> Response with Io, Net, Fail[AppError] =
+  let config = read_config("/etc/app.conf")?   -- adds Io, Fail
+  let data = Http.get(config.data_url)?         -- adds Net
+  process_response(data)                        -- pure: always allowed
+```
+
+## Effect Inference
+
+Within a function body, effects are inferred from the operations performed. You do not need to annotate which specific line produces which effect -- the compiler figures it out. At module boundaries, effect signatures are checked against the inferred effects.
+
+```japl
+-- The compiler infers this function has effects: Io, Fail[ParseError]
+fn load_config(path: String) -> Config with Io, Fail[ParseError] =
+  let text = File.read_to_string(path)   -- infers Io
+  parse_config(text)                      -- infers Fail[ParseError]
+```
+
+If you declare fewer effects than the body requires, the compiler reports an error. If you declare more effects than the body uses, that is allowed (your function is conservatively annotated).
+
+## Effect Handlers
+
+Effect handlers interpret effectful computations, discharging their effects. They let you run effectful code in a context that provides the effect's implementation, producing a pure value.
+
+### Handling State
+
+`State.run` takes an initial state and a computation with `State[s]` effect, and produces a pure value:
+
+```japl
+fn accumulate(items: List[Int]) -> Int with State[Int] =
+  List.each(items, fn x -> State.modify(fn acc -> acc + x))
+  State.get()
+
+fn main() -> Unit with Io =
+  let result = State.run(0, fn ->
+    accumulate([1, 2, 3, 4, 5])
+  )
+  Io.println(Int.to_string(result))  -- prints 15
+```
+
+### Handling Fail
+
+`Fail.catch` converts a computation with `Fail[e]` into a `Result[a, e]` value:
+
+```japl
+let result: Result[Config, ConfigError] = Fail.catch(fn ->
+  read_config("/etc/app.conf")
+)
+
+match result with
+| Ok(config) -> use_config(config)
+| Err(e) -> handle_error(e)
+```
+
+### Composing Handlers
+
+Effects can be handled at any level, and handlers compose naturally:
+
+```japl
+fn main() -> Unit with Io =
+  let result = Fail.catch(fn ->
+    State.run(0, fn ->
+      complex_computation()
+    )
+  )
+  match result with
+  | Ok(value) -> Io.println("Success: " ++ show(value))
+  | Err(e) -> Io.println("Error: " ++ show(e))
+```
+
+Each handler discharges one effect, peeling away layers until you reach a pure value or the outermost `Io` effect in `main`.
+
+## Effect Compatibility
+
+The effect system prevents calling effectful functions from pure contexts. Here is the compatibility table:
+
+| Callee Effect | Can be called from |
+|---------------|-------------------|
+| `Pure` | Any context |
+| `Fail[e]` | Functions with `Fail[e]` or functions returning `Result` |
+| `State[s]` | Functions with `State[s]` or `Io` |
+| `Process` | Functions with `Process` or `Async` |
+| `Net` | Functions with `Net` or `Io` |
+| `Io` | Functions with `Io` |
+| `Async` | Functions with `Async` |
+
+> **Comparison with Other Languages**
+>
+> Haskell tracks effects through the `IO` monad, which is a single coarse-grained effect. Everything effectful is `IO`, and you cannot distinguish between file access and network access at the type level. JAPL's effect rows provide fine-grained tracking: you can see exactly which effects a function uses.
+>
+> Koka and Frank also use algebraic effects with handlers, but they expose the full generality of user-defined effects and handlers. JAPL takes a more pragmatic approach with a fixed set of well-known effects, trading some generality for simplicity and predictability.
+>
+> Rust has no effect system. Side effects are tracked informally through naming conventions and documentation. JAPL makes this tracking formal and compiler-verified.
+
+## Effects and Processes
+
+The `Process[m]` effect is special: it is available inside process bodies and enables spawn, send, and receive operations. The type parameter `m` specifies the mailbox message type.
+
+```japl
+fn counter(count: Int) -> Never with Process[CounterMsg] =
+  match Process.receive() with
+  | Increment -> counter(count + 1)
+  | Decrement -> counter(count - 1)
+  | GetCount(reply) ->
+      Reply.send(reply, count)
+      counter(count)
+```
+
+The Process effect ensures that process operations cannot be called from pure code, and the mailbox type parameter prevents sending messages of the wrong type.
+
+## Effects and the Module System
+
+At module boundaries, effect signatures serve as contracts. When you import a function from another module, its effect signature tells you exactly what side effects calling it will introduce. This makes it possible to reason about effects locally without reading the implementation of every function you call.
+
+```japl
+module Http.Server
+
+import Http.{Request, Response, Status}
+
+-- The effect signature is the contract
+fn handle_request(req: Request) -> Response with Io, Net =
+  let body = Json.parse(req.body)
+  match body with
+  | Ok(data) -> Response.json(Status.Ok, data)
+  | Err(_) -> Response.text(Status.BadRequest, "invalid JSON")
+```
+
+## Common Patterns
+
+### Effect Polymorphism
+
+Functions can be polymorphic over effects, accepting any effectful computation:
+
+```japl
+fn timed[a](label: String, f: fn() -> a with Io) -> a with Io =
+  let start = Io.clock()
+  let result = f()
+  let elapsed = Io.clock() - start
+  Io.println(label ++ ": " ++ Float.to_string(elapsed) ++ "ms")
+  result
+```
+
+### Layered Effect Handling
+
+Build applications by handling effects at appropriate levels:
+
+```japl
+fn app_main() -> Unit with Io =
+  -- Handle Fail at the top level
+  let result = Fail.catch(fn ->
+    -- Handle State for request-scoped data
+    State.run(initial_context(), fn ->
+      process_request(incoming_request)
+    )
+  )
+  match result with
+  | Ok(response) -> send_response(response)
+  | Err(e) -> send_error_response(e)
+```
+
+## Best Practices
+
+**Keep functions as pure as possible.** The fewer effects a function has, the easier it is to test, compose, and reason about. Extract pure logic from effectful functions wherever you can.
+
+**Use `Fail[e]` instead of returning `Result` directly** when the error should propagate automatically. The `?` operator works with both, but `Fail[e]` composes more cleanly in effect signatures.
+
+**Handle effects at the boundaries.** Let effects propagate through your application and handle them at the edges: in `main`, in HTTP handlers, in process entry points. This keeps the interior of your application maximally pure.
+
+**Prefer fine-grained effects.** Use `Net` instead of `Io` when a function only does network operations. More precise effect signatures give callers better information about what a function actually does.

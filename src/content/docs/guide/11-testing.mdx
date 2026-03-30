@@ -1,0 +1,323 @@
+---
+title: "Testing"
+description: "Deep dive into JAPL's built-in test blocks, assertions, property-based testing, benchmarks, and test runner."
+status: "stable"
+order: 11
+section: "guide"
+prev: { title: "Records", slug: "guide/10-records" }
+next: { title: "Compiler Internals", slug: "guide/12-compiler" }
+---
+
+# Testing
+
+Testing in JAPL is a first-class language feature, not a library. Test blocks, property-based tests, and benchmarks are all top-level declarations recognized by the compiler. The test runner is built into the `japl` toolchain. There is no test framework to install, no test harness to configure, and no magic naming conventions to follow.
+
+This design reflects a simple belief: if testing is easy, programmers write more tests. If testing requires setup and boilerplate, programmers write fewer tests. By making tests a language primitive, JAPL removes every barrier between thinking "I should test this" and having a test.
+
+## Test Blocks
+
+Test blocks are top-level declarations that use the `test` keyword followed by a description string and a body expression:
+
+```japl
+test "parsing a valid integer" =
+  assert parse_int("42") == Ok(42)
+
+test "parsing rejects non-numeric input" =
+  assert parse_int("abc") == Err(InvalidInt("abc"))
+
+test "user creation validates email" =
+  let result = create_user("bad-email")
+  assert result == Err(InvalidEmail("bad-email"))
+```
+
+The compiler discovers all test blocks automatically. No test registration, no test suites, no annotations beyond the `test` keyword itself.
+
+Test blocks can contain any expression, including effectful operations:
+
+```japl
+test "file reading works" =
+  let content = File.read_to_string("test/fixtures/sample.txt")
+  assert content == Ok("hello world\n")
+```
+
+## Assert Expressions
+
+`assert expr` evaluates `expr`. If it is `True`, execution continues. If `False`, the test fails with a diagnostic message.
+
+The most powerful form is `assert expr1 == expr2`, which provides rich failure diagnostics showing both values:
+
+```
+FAILED: test "order total includes tax"
+  assert total == 33.0
+  left:  33.1
+  right: 33.0
+  at src/order_test.japl:15:3
+```
+
+The diagnostic shows the assertion expression, the actual values on both sides, and the source location. This eliminates the need for specialized assertion functions like `assertEqual`, `assertContains`, or `assertGreaterThan` found in other testing frameworks. A simple `assert` with `==` gives you everything you need.
+
+### Assertion Patterns
+
+```japl
+-- Equality
+assert result == expected
+
+-- Boolean conditions
+assert List.length(items) > 0
+assert String.contains(output, "error")
+
+-- Pattern matching in assertions
+assert match result with
+  | Ok(_) -> True
+  | Err(_) -> False
+
+-- Combining conditions
+assert is_valid(input) && is_unique(input)
+```
+
+## Property-Based Testing
+
+Property-based testing goes beyond example-based tests. Instead of testing specific inputs, you declare universal properties that must hold for all inputs. The test runner generates random values and checks the property.
+
+```japl
+property "reversing a list twice is identity" =
+  forall (xs: List[Int]) ->
+    List.reverse(List.reverse(xs)) == xs
+
+property "sort produces ordered output" =
+  forall (xs: List[Int]) ->
+    let sorted = List.sort(xs)
+    is_sorted(sorted) && List.length(sorted) == List.length(xs)
+```
+
+The `forall` keyword introduces universally quantified test variables. The test runner generates random values and checks the property. If a counterexample is found, it is **shrunk** to a minimal failing case, making it easy to understand what went wrong.
+
+### How Shrinking Works
+
+When a property fails for a generated input, the test runner tries to find a simpler input that still fails. For example, if `[42, -7, 0, 15, -3]` causes a failure, the shrinker might find that `[-1, 0]` is the minimal failing case. This dramatically simplifies debugging.
+
+### Generators
+
+Types used in `forall` must implement the `Arbitrary` trait, which is auto-derivable for most types:
+
+```japl
+type UserInput deriving(Arbitrary) = {
+  name: String,
+  age: Int,
+  email: String,
+}
+
+property "user validation never crashes" =
+  forall (input: UserInput) ->
+    match validate_user(input) with
+    | Ok(_) -> True
+    | Err(_) -> True  -- errors are fine, crashes are not
+```
+
+The standard library provides `Arbitrary` instances for all primitive types and common containers.
+
+### Custom Generators
+
+For types that need constrained generation (e.g., valid email addresses, positive integers), you can provide custom generators:
+
+```japl
+property "positive numbers stay positive after doubling" =
+  forall (n: Int) ->
+    if n > 0 then n * 2 > 0
+    else True  -- skip non-positive inputs
+```
+
+## Benchmark Blocks
+
+Benchmarks measure execution time of expressions:
+
+```japl
+bench "fibonacci 30" =
+  fibonacci(30)
+
+bench "sorting 10000 elements" =
+  let data = List.range(1, 10000) |> List.reverse
+  List.sort(data)
+```
+
+The test runner reports mean time, standard deviation, and throughput. Benchmarks are run multiple times to get stable measurements, with warmup iterations to account for JIT effects and cache warming.
+
+Benchmark output looks like:
+
+```
+bench "fibonacci 30"           ... 1.23 ms +/- 0.05 ms (812 runs/s)
+bench "sorting 10000 elements" ... 4.56 ms +/- 0.12 ms (219 runs/s)
+```
+
+## Running Tests
+
+The `japl test` command discovers and runs all tests in the project:
+
+```
+$ japl test                        -- run all tests
+$ japl test --filter user          -- run tests matching "user"
+$ japl test --parallel 8           -- parallel execution on 8 threads
+$ japl test --coverage             -- with coverage report
+$ japl test --property-seed 42     -- deterministic property tests
+```
+
+### Test Output
+
+```
+Running 42 tests...
+
+  PASS  parsing a valid integer (0.1ms)
+  PASS  parsing rejects non-numeric input (0.1ms)
+  FAIL  user creation validates email (0.2ms)
+    assert result == Err(InvalidEmail("bad-email"))
+    left:  Ok(User { name = "", email = "bad-email" })
+    right: Err(InvalidEmail("bad-email"))
+    at src/user_test.japl:12:3
+
+  PASS  [property] reversing a list twice is identity (50 trials, 12.3ms)
+  PASS  [property] sort produces ordered output (100 trials, 45.6ms)
+
+Results: 41 passed, 1 failed (58.3ms)
+```
+
+### Filtering
+
+The `--filter` flag matches against test description strings:
+
+```
+$ japl test --filter "parsing"     -- runs both parsing tests
+$ japl test --filter "property"    -- runs only property-based tests
+```
+
+### Parallel Execution
+
+By default, tests run in parallel. The `--parallel` flag controls the degree of parallelism. Tests that require exclusive access to shared resources (files, ports) should be designed to use unique resources to avoid conflicts.
+
+### Coverage
+
+The `--coverage` flag generates a coverage report showing which lines and branches were exercised by the test suite. This helps identify untested code paths.
+
+### Deterministic Property Testing
+
+By default, property-based tests use random seeds that change on each run. The `--property-seed` flag pins the seed for reproducible runs. This is useful for CI and for reproducing failures:
+
+```
+$ japl test --property-seed 42
+```
+
+> **Comparison with Other Languages**
+>
+> **Rust:** Rust has `#[test]` annotations and the built-in test runner. Property testing requires external crates like `proptest`. Benchmarks use the unstable `#[bench]` or external crates like `criterion`. JAPL integrates all three natively.
+>
+> **Go:** Go has `func TestXxx(t *testing.T)` and `func BenchmarkXxx(b *testing.B)`. No built-in property testing. JAPL's syntax is more concise and declarative.
+>
+> **Haskell:** Haskell has `QuickCheck` for property testing (the original!) but requires a test framework (HUnit, Tasty) for unit tests. JAPL unifies both under the same syntax.
+>
+> **Erlang:** Erlang has EUnit and PropEr/QuickCheck. JAPL follows the same philosophy of built-in testing but with more concise syntax.
+
+## Testing Processes
+
+Testing concurrent code requires spawning processes and checking their behavior:
+
+```japl
+test "counter process increments" =
+  let pid = Process.spawn(fn -> counter(0))
+  Process.send(pid, Increment)
+  Process.send(pid, Increment)
+  Process.send(pid, Increment)
+  let reply = Reply.new()
+  Process.send(pid, GetCount(reply))
+  let count = Reply.receive(reply)
+  assert count == 3
+```
+
+The test runner handles process lifecycle: processes spawned during a test are automatically terminated when the test completes.
+
+## Testing Effectful Code
+
+Effectful code can be tested by providing effect handlers:
+
+```japl
+test "accumulate computes sum" =
+  let result = State.run(0, fn ->
+    accumulate([1, 2, 3, 4, 5])
+  )
+  assert result == 15
+
+test "config loading handles missing file" =
+  let result = Fail.catch(fn ->
+    read_config("/nonexistent/path")
+  )
+  assert match result with
+  | Err(FileNotFound(_)) -> True
+  | _ -> False
+```
+
+## Common Patterns
+
+### Table-Driven Tests
+
+Test multiple inputs with a single test structure:
+
+```japl
+test "parse_int handles various inputs" =
+  let cases = [
+    ("42", Ok(42)),
+    ("-1", Ok(-1)),
+    ("0", Ok(0)),
+    ("abc", Err(InvalidInt("abc"))),
+    ("", Err(InvalidInt(""))),
+  ]
+  List.each(cases, fn (input, expected) ->
+    assert parse_int(input) == expected
+  )
+```
+
+### Setup and Teardown
+
+Use helper functions for common setup:
+
+```japl
+fn with_test_db(f: fn(DbConn) -> Unit) -> Unit with Io =
+  use conn = Db.connect(test_db_url)?
+  Db.run_migrations(conn)?
+  f(conn)
+  Db.rollback(conn)?
+  Db.close(conn)
+
+test "user creation" =
+  with_test_db(fn conn ->
+    let user = create_user(conn, "Alice", "alice@example.com")
+    assert user.name == "Alice"
+  )
+```
+
+### Testing Error Paths
+
+Explicitly test that errors occur when expected:
+
+```japl
+test "division by zero returns error" =
+  let result = safe_divide(10, 0)
+  assert result == Err(DivisionByZero)
+
+test "empty list has no head" =
+  let result = List.head([])
+  assert result == None
+```
+
+## Best Practices
+
+**Write tests next to the code they test.** JAPL allows test blocks in any source file. Put tests in the same file as the code they exercise, or in a companion `_test.japl` file.
+
+**Use property-based tests for algorithmic code.** Any function with clear algebraic properties (idempotency, commutativity, round-trip invariants) benefits from property testing.
+
+**Keep tests focused.** Each test block should check one behavior. Use descriptive names that explain what is being tested and what the expected outcome is.
+
+**Test error paths explicitly.** Do not just test the happy path. Write tests for invalid inputs, boundary conditions, and error cases.
+
+**Use table-driven tests for systematic coverage.** When a function has many valid inputs, list them in a table rather than writing separate test blocks.
+
+**Pin property seeds in CI.** Use `--property-seed` in CI to make property tests deterministic and reproducible. Use random seeds locally to discover new edge cases.
+
+**Benchmark before and after changes.** Use bench blocks to measure performance-critical code and detect regressions.

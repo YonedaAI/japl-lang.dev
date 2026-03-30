@@ -1,0 +1,157 @@
+---
+title: "Building & Deploying"
+description: "Learn how to compile, run, test, and deploy JAPL programs with the CLI toolchain."
+status: "stable"
+order: 10
+section: "tour"
+prev: { title: "Supervision", slug: "docs/tour/09-supervision" }
+---
+
+# Building & Deploying
+
+JAPL comes with a straightforward toolchain for compiling, running, testing, and deploying programs. The compiler is built in Rust and produces fast, static binaries.
+
+## Running a Program
+
+The quickest way to run a JAPL file is with `cargo run` from the compiler directory:
+
+```bash
+cd compiler
+cargo run -- run path/to/program.japl
+```
+
+This compiles and executes the program in one step. The entry point is the `main` function.
+
+## Building the Compiler
+
+Build the JAPL compiler from source:
+
+```bash
+cd compiler
+cargo build --release
+```
+
+This produces the `japl` binary in `target/release/`. Once built, you can use it directly:
+
+```bash
+./target/release/japl run program.japl
+```
+
+## Running Tests
+
+Run the compiler's test suite with:
+
+```bash
+cd compiler
+cargo test
+```
+
+This executes tests across all compiler crates -- lexer, parser, type checker, code generation, and runtime.
+
+## Project Structure
+
+A JAPL project follows this layout:
+
+```
+my_project/
+  src/
+    main.japl        -- entry point
+    lib.japl         -- library code
+  test/
+    test_main.japl   -- tests
+  japl.toml          -- project configuration
+```
+
+## The Compiler Pipeline
+
+The JAPL compiler is organized as a Rust workspace with modular crates, each handling one stage of compilation:
+
+| Stage | Crate | Role |
+|-------|-------|------|
+| Lexing | `japl-lexer` | Tokenizes source into a token stream |
+| Parsing | `japl-parser` | Builds an abstract syntax tree |
+| Type checking | `japl-checker` | Type inference, unification, effect tracking |
+| Lowering | `japl-ir` | Converts AST to intermediate representation |
+| Code generation | `japl-codegen` | Generates output code |
+| Runtime | `japl-runtime` | Process scheduler, mailboxes, supervision |
+| Standard library | `japl-stdlib` | Built-in functions and types |
+
+## WASM Target
+
+JAPL can compile to WebAssembly, enabling programs to run in browsers and edge runtimes:
+
+```bash
+cargo run -- build --target wasm program.japl
+```
+
+The WASM backend generates WAT (WebAssembly Text Format) that can be compiled to a `.wasm` binary.
+
+## Standard Library
+
+JAPL ships with a standard library providing core types and functions:
+
+- **Option**: `Some(x)` / `None` for optional values
+- **Result**: `Ok(x)` / `Err(e)` for error handling
+- **Process**: `spawn`, `send`, `receive` for concurrency
+- **List**: Common list operations
+- **String**: String manipulation and formatting
+
+Import standard library modules in your code:
+
+```japl
+-- Standard library types are available by default
+let opt = Some(42)
+let result = Ok("success")
+```
+
+## Writing Tests
+
+JAPL tests are regular functions that assert expected behavior:
+
+```japl
+fn test_addition() {
+  let result = add(2, 3)
+  assert(result == 5, "2 + 3 should equal 5")
+}
+
+fn test_division() {
+  match divide(10, 0) {
+    Err(e) => assert(e == "division by zero", "should report division by zero")
+    Ok(_) => assert(False, "should have failed")
+  }
+}
+```
+
+Run them with the test command to get a report of passing and failing tests.
+
+## Deployment
+
+JAPL compiles to static binaries with no runtime dependencies. Deploy by copying the binary to your target machine:
+
+```bash
+# Build a release binary
+cd compiler
+cargo build --release
+
+# Copy to server
+scp target/release/my_app user@server:/opt/my_app/
+```
+
+For distributed systems, each node runs its own JAPL binary. Nodes discover each other and form a cluster automatically when configured with the same cluster cookie.
+
+## What You Have Learned
+
+This tour covered the core of JAPL:
+
+1. **Values & Bindings** -- Immutable data and let bindings
+2. **Types** -- Sum types, records, Option, Result
+3. **Functions** -- Named functions, lambdas, closures, higher-order functions
+4. **Pattern Matching** -- Exhaustive destructuring of data
+5. **Error Handling** -- Errors as values with Result and Option
+6. **Pipes & Composition** -- Data pipelines with `|>` and `>>`
+7. **Effects** -- Tracking side effects in the type system
+8. **Processes** -- Lightweight concurrent processes with message passing
+9. **Supervision** -- Fault-tolerant process trees
+10. **Building & Deploying** -- Compiling, testing, and shipping your code
+
+You now have the foundation to build concurrent, fault-tolerant applications with JAPL.

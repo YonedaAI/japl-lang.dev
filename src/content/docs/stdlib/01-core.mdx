@@ -1,0 +1,236 @@
+---
+title: "Core"
+description: "Reference for the Core standard library module providing fundamental combinators and utility functions."
+status: "stable"
+order: 1
+section: "stdlib"
+next: { title: "List", slug: "stdlib/02-list" }
+---
+
+# Core
+
+The `Core` module provides fundamental combinators and utility functions used throughout JAPL programs. These are general-purpose higher-order functions for composition, application, and value manipulation.
+
+```japl
+import Core
+```
+
+---
+
+## identity
+
+```japl
+fn identity(x: a) -> a
+```
+
+Returns its argument unchanged. The identity function is useful as a default transformer or placeholder in higher-order contexts.
+
+### Example
+
+```japl
+let x = Core.identity(42)
+-- x is 42
+
+[1, 2, 3] |> List.map(Core.identity)
+-- [1, 2, 3]
+```
+
+---
+
+## const_
+
+```japl
+fn const_(x: a, _y: b) -> a
+```
+
+Returns its first argument and ignores its second. Useful for producing a constant value in contexts that supply an extra argument.
+
+### Example
+
+```japl
+let result = Core.const_("hello", 42)
+-- result is "hello"
+
+[1, 2, 3] |> List.map(fn(x) { Core.const_(0, x) })
+-- [0, 0, 0]
+```
+
+---
+
+## flip
+
+```japl
+fn flip(f: fn(a, b) -> c) -> fn(b, a) -> c
+```
+
+Takes a two-argument function and returns a new function with the argument order reversed.
+
+### Example
+
+```japl
+let div = fn(a, b) { a / b }
+let flipped_div = Core.flip(div)
+flipped_div(2, 10)
+-- 5 (equivalent to div(10, 2))
+```
+
+---
+
+## compose
+
+```japl
+fn compose(f: fn(b) -> c, g: fn(a) -> b) -> fn(a) -> c
+```
+
+Composes two functions right-to-left. `compose(f, g)` produces a function that first applies `g`, then applies `f` to the result. Equivalent to the mathematical notation `f . g`.
+
+### Example
+
+```japl
+let double = fn(x) { x * 2 }
+let add_one = fn(x) { x + 1 }
+let double_then_add = Core.compose(add_one, double)
+double_then_add(3)
+-- 7 (double(3) = 6, then add_one(6) = 7)
+```
+
+---
+
+## pipe
+
+```japl
+fn pipe(x: a, f: fn(a) -> b) -> b
+```
+
+Applies a function to a value. `pipe(x, f)` is equivalent to `f(x)`. This is the function form of the `|>` operator.
+
+### Example
+
+```japl
+Core.pipe(42, int_to_string)
+-- "42"
+
+Core.pipe("hello", string_length)
+-- 5
+```
+
+---
+
+## apply
+
+```japl
+fn apply(f: fn(a) -> b, x: a) -> b
+```
+
+Applies a function to a value. `apply(f, x)` is equivalent to `f(x)`. The argument order is reversed compared to `pipe`.
+
+### Example
+
+```japl
+Core.apply(int_to_string, 42)
+-- "42"
+```
+
+---
+
+## always
+
+```japl
+fn always(x: a) -> fn(b) -> a
+```
+
+Returns a function that always produces the given value, regardless of its argument. Useful for creating constant-valued callbacks.
+
+### Example
+
+```japl
+let zero = Core.always(0)
+zero("anything")
+-- 0
+
+[1, 2, 3] |> List.map(Core.always("x"))
+-- ["x", "x", "x"]
+```
+
+---
+
+## Built-in Functions
+
+The following functions are built into the JAPL runtime and available without importing any module:
+
+### println
+
+```japl
+fn println(value: a) -> Unit
+```
+
+Prints a value to standard output followed by a newline.
+
+```japl
+println("Hello, world!")
+println(42)
+```
+
+### print
+
+```japl
+fn print(value: a) -> Unit
+```
+
+Prints a value to standard output without a trailing newline.
+
+```japl
+print("Enter name: ")
+```
+
+### show
+
+```japl
+fn show(value: a) -> String
+```
+
+Converts any value to its string representation.
+
+```japl
+let s = show(42)
+-- s is "42"
+```
+
+### int_to_string
+
+```japl
+fn int_to_string(n: Int) -> String
+```
+
+Converts an integer to its decimal string representation.
+
+```japl
+int_to_string(42)
+-- "42"
+```
+
+### string_length
+
+```japl
+fn string_length(s: String) -> Int
+```
+
+Returns the length of a string.
+
+```japl
+string_length("hello")
+-- 5
+```
+
+### string_concat
+
+```japl
+fn string_concat(a: String, b: String) -> String
+```
+
+Concatenates two strings. Equivalent to the `<>` operator.
+
+```japl
+string_concat("hello", " world")
+-- "hello world"
+```

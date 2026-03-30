@@ -1,0 +1,116 @@
+---
+title: "Option"
+description: "Reference for the Option standard library module providing safe handling of optional values."
+status: "stable"
+order: 5
+section: "stdlib"
+prev: { title: "Math", slug: "stdlib/04-math" }
+next: { title: "Result", slug: "stdlib/06-result" }
+---
+
+# Option
+
+The `Option` module provides functions for working with optional values. The `Option` type represents a value that may or may not be present, eliminating the need for null references.
+
+## Type Definition
+
+```japl
+type Option =
+  | Some(Int)
+  | None
+```
+
+> **Note:** The current stdlib `Option` is specialized to `Int`. The language specification defines the polymorphic `Option[a] = Some(a) | None`, which will be used once the full type system is wired in.
+
+---
+
+## map_option
+
+```japl
+fn map_option(opt: Option, f: fn(Int) -> Int) -> Option
+```
+
+Applies a function to the value inside `Some`, or returns `None` unchanged. This is the functor `map` operation for `Option`.
+
+### Example
+
+```japl
+map_option(Some(5), fn(x) { x * 2 })
+-- Some(10)
+
+map_option(None, fn(x) { x * 2 })
+-- None
+```
+
+---
+
+## unwrap_or
+
+```japl
+fn unwrap_or(opt: Option, fallback: Int) -> Int
+```
+
+Returns the value inside `Some`, or the provided fallback if the option is `None`.
+
+### Example
+
+```japl
+unwrap_or(Some(42), 0)
+-- 42
+
+unwrap_or(None, 0)
+-- 0
+```
+
+---
+
+## is_some
+
+```japl
+fn is_some(opt: Option) -> Bool
+```
+
+Returns `True` if the option contains a value, `False` if it is `None`.
+
+### Example
+
+```japl
+is_some(Some(1))
+-- True
+
+is_some(None)
+-- False
+```
+
+---
+
+## is_none
+
+```japl
+fn is_none(opt: Option) -> Bool
+```
+
+Returns `True` if the option is `None`, `False` if it contains a value.
+
+### Example
+
+```japl
+is_none(None)
+-- True
+
+is_none(Some(1))
+-- False
+```
+
+---
+
+## Pattern Matching
+
+`Option` values are commonly used with pattern matching:
+
+```japl
+match List.head([1, 2, 3]) {
+  Some(x) => println("First element: " <> show(x))
+  None => println("List is empty")
+}
+```

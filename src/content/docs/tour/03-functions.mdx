@@ -1,0 +1,141 @@
+---
+title: "Functions"
+description: "Learn about function definitions, lambdas, higher-order functions, and closures in JAPL."
+status: "stable"
+order: 3
+section: "tour"
+prev: { title: "Types", slug: "docs/tour/02-types" }
+next: { title: "Pattern Matching", slug: "docs/tour/04-pattern-matching" }
+---
+
+# Functions
+
+Functions are the primary unit of computation in JAPL. They take typed inputs, produce typed outputs, and compose cleanly with each other. JAPL supports named functions, anonymous functions (lambdas), higher-order functions, and closures.
+
+## Named Functions
+
+Define a function with `fn`, parameter types, and a return type:
+
+```japl
+fn double(x: Int) -> Int { x * 2 }
+fn square(x: Int) -> Int { x * x }
+```
+
+Functions with multiple parameters work as you would expect:
+
+```japl
+fn add(x: Int, y: Int) -> Int { x + y }
+```
+
+The body of a function is an expression. The last expression is the return value -- there is no `return` keyword.
+
+## Type Annotations
+
+Every function parameter and return type is annotated. This makes function signatures self-documenting and lets the compiler catch errors early:
+
+```japl
+fn greet(name: String) -> String {
+  "Hello, " <> name <> "!"
+}
+```
+
+When a function returns nothing meaningful, use `Unit`:
+
+```japl
+fn log(message: String) -> Unit {
+  println(message)
+}
+```
+
+## Anonymous Functions (Lambdas)
+
+Create a function value with `fn(params) { body }`:
+
+```japl
+let add_ten = fn(x: Int) { x + 10 }
+```
+
+Lambdas are values. You can bind them to names, pass them as arguments, or return them from other functions.
+
+## Higher-Order Functions
+
+A higher-order function takes a function as a parameter or returns one. This is where JAPL's functional character shines.
+
+Pass a function as an argument:
+
+```japl
+fn apply(f: fn(Int) -> Int, x: Int) -> Int { f(x) }
+
+fn main() {
+  println(show(apply(double, 5)))    -- prints 10
+  println(show(apply(square, 4)))    -- prints 16
+}
+```
+
+Apply a function multiple times:
+
+```japl
+fn apply_twice(f: fn(Int) -> Int, x: Int) -> Int { f(f(x)) }
+
+fn main() {
+  println(show(apply_twice(double, 3)))  -- prints 12
+}
+```
+
+You can also pass a lambda directly:
+
+```japl
+let result = apply(fn(x: Int) { x + 10 }, 5)
+-- result is 15
+```
+
+## Closures
+
+A closure is a function that captures values from its surrounding scope. This lets you create specialized functions on the fly:
+
+```japl
+fn make_adder(n: Int) -> fn(Int) -> Int {
+  fn(x: Int) { x + n }
+}
+
+fn main() {
+  let add5 = make_adder(5)
+  let add10 = make_adder(10)
+  println(show(add5(3)))       -- prints 8
+  println(show(add10(3)))      -- prints 13
+  println(show(add5(add10(1))))  -- prints 16
+}
+```
+
+The returned function remembers the value of `n` from the call that created it. Each call to `make_adder` produces a distinct closure with its own captured value.
+
+## Recursion
+
+JAPL relies on recursion rather than loops. Functions can call themselves to iterate:
+
+```japl
+fn run_sequence(light: Light, steps: Int) -> Light {
+  if steps <= 0 { light }
+  else {
+    println("  " <> light_name(light))
+    run_sequence(transition(light, Next), steps - 1)
+  }
+}
+```
+
+Tail-recursive functions (where the recursive call is the last expression) are optimized by the compiler to avoid stack overflow.
+
+## Function Types
+
+Function types are written as `fn(ParamType) -> ReturnType`. You can use them anywhere a type is expected:
+
+```japl
+fn apply(f: fn(Int) -> Int, x: Int) -> Int { f(x) }
+fn make_adder(n: Int) -> fn(Int) -> Int { fn(x: Int) { x + n } }
+```
+
+This makes it clear at every call site exactly what shape of function is expected and what it produces.
+
+## Next Steps
+
+Functions become even more powerful when combined with pattern matching. Learn how in [Pattern Matching](/docs/tour/04-pattern-matching).

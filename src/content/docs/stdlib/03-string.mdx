@@ -1,0 +1,118 @@
+---
+title: "String"
+description: "Reference for the String standard library module providing operations on immutable UTF-8 strings."
+status: "stable"
+order: 3
+section: "stdlib"
+prev: { title: "List", slug: "stdlib/02-list" }
+next: { title: "Math", slug: "stdlib/04-math" }
+---
+
+# String
+
+The `String` module provides operations on JAPL's immutable UTF-8 strings. Strings in JAPL are immutable values -- all operations return new strings rather than modifying existing ones.
+
+The `<>` operator is available for string concatenation without importing this module.
+
+---
+
+## length
+
+```japl
+fn length(s: String) -> Int
+```
+
+Returns the length of the string. Delegates to the built-in `string_length` function.
+
+### Example
+
+```japl
+String.length("hello")
+-- 5
+
+String.length("")
+-- 0
+```
+
+---
+
+## concat
+
+```japl
+fn concat(a: String, b: String) -> String
+```
+
+Concatenates two strings using the `<>` operator. Returns a new string consisting of `a` followed by `b`.
+
+### Example
+
+```japl
+String.concat("hello", " world")
+-- "hello world"
+
+String.concat("", "test")
+-- "test"
+```
+
+---
+
+## is_empty
+
+```japl
+fn is_empty(s: String) -> Bool
+```
+
+Returns `True` if the string has zero length, `False` otherwise.
+
+### Example
+
+```japl
+String.is_empty("")
+-- True
+
+String.is_empty("hello")
+-- False
+```
+
+---
+
+## repeat
+
+```japl
+fn repeat(s: String, n: Int) -> String
+```
+
+Returns a new string consisting of `s` repeated `n` times. If `n` is zero or negative, returns an empty string.
+
+### Example
+
+```japl
+String.repeat("ha", 3)
+-- "hahaha"
+
+String.repeat("ab", 0)
+-- ""
+
+String.repeat("-", 10)
+-- "----------"
+```
+
+---
+
+## join
+
+```japl
+fn join(sep: String, a: String, b: String) -> String
+```
+
+Joins two strings with a separator between them.
+
+### Example
+
+```japl
+String.join(", ", "hello", "world")
+-- "hello, world"
+
+String.join("/", "path", "to")
+-- "path/to"
+```

@@ -1,0 +1,361 @@
+---
+title: "Compiler Internals"
+description: "Walkthrough of the JAPL compiler pipeline from lexer to codegen, crate architecture, and contributing guide."
+status: "stable"
+order: 12
+section: "guide"
+prev: { title: "Testing", slug: "guide/11-testing" }
+---
+
+# Compiler Internals
+
+The JAPL compiler is a stage-0 bootstrap compiler written in Rust. It transforms JAPL source code through a multi-stage pipeline into native binaries or WASM modules. Understanding the compiler's architecture is valuable both for contributors and for users who want to understand error messages, performance characteristics, or the boundaries of what the type checker can infer.
+
+This chapter walks through the complete pipeline, from source text to binary output, explaining the role of each crate and the key design decisions at each stage.
+
+## Pipeline Overview
+
+The compiler pipeline has seven stages:
+
+```
+Source (.japl)
+    |
+    v
+  Lexer (japl-lexer)         -- Token stream
+    |
+    v
+  Parser (japl-parser)       -- Untyped AST
+    |
+    v
+  Name Resolution            -- Resolved AST
+  Type Checker               -- Typed AST
+  Effect Checker             -- Effect-annotated AST
+  Linearity Checker          -- Verified AST
+    (all in japl-checker)
+    |
+    v
+  IR Lowering (japl-ir)      -- JAPL MIR
+    |
+    v
+  Optimization (japl-ir)     -- Optimized MIR
+    |
+    v
+  Code Generation            -- Object file
+  (japl-codegen)
+    |
+    v
+  Linking (japl-codegen)     -- Binary / Library
+```
+
+Every stage produces structured diagnostics via a shared `Diagnostic` type. Errors carry source spans, severity levels, and optional fix suggestions. The driver collects diagnostics from all stages and renders them through a configurable reporter (terminal with colors, JSON for editor integration, or SARIF for CI).
+
+## Lexer (japl-lexer)
+
+The lexer transforms source text into a stream of tokens. It uses the `logos` crate (0.14) for DFA-based lexing, which provides zero-allocation, extremely fast token recognition.
+
+### Token Types
+
+The lexer produces tokens for keywords (`fn`, `let`, `match`, `type`, `module`, `import`, etc.), literals (integers, floats, strings, chars, booleans), identifiers (lowercase for values, uppercase for types), operators (`+`, `-`, `|>`, `>>`, `?`, etc.), and delimiters.
+
+### Three Modes
+
+The lexer operates in three modes:
+
+1. **Normal mode** -- standard token recognition via DFA.
+2. **String mode** -- entered on `"`, handles escape sequences and `${}` interpolation.
+3. **Indentation mode** -- after every newline, measures leading whitespace and emits synthetic `Indent`/`Dedent` tokens.
+
+### Key Design Decisions
+
+- **Inside parentheses, brackets, and braces, newlines and indentation are insignificant.** The lexer tracks nesting depth and suppresses `Indent`/`Dedent` emission when `paren_depth > 0`. This means you can freely break expressions across lines inside delimiters.
+- **String interpolation uses `${}` syntax.** The lexer pushes interpolation contexts on `${` and pops on `}`.
+- **The indent stack starts with `[0]`.** A newline followed by more spaces than the current top pushes a new level and emits `Indent`. Fewer spaces pops levels and emits one `Dedent` per popped level.
+
+```rust
+pub struct Lexer<'src> {
+    source: &'src str,
+    inner: logos::Lexer<'src, Token>,
+    indent_stack: Vec<u32>,
+    pending: VecDeque<SpannedToken>,
+    mode: LexerMode,
+    paren_depth: u32,
+}
+```
+
+### Dependencies
+
+| Crate | Purpose |
+|-------|---------|
+| `logos` 0.14 | DFA-based token recognition |
+| `smol_str` | Interned, small-string-optimized identifiers |
+| `japl-ast` | `Span`, `FileId`, `Diagnostic` types |
+
+## Parser (japl-parser)
+
+The parser transforms the token stream into an untyped AST. It uses a **Pratt + recursive descent hybrid**: Pratt parsing for expressions (handling operator precedence elegantly) and recursive descent for declarations (modules, types, functions, traits, impls).
+
+### Precedence Table
+
+Operators are parsed with these binding powers (higher = tighter):
+
+| Precedence | Operators | Description |
+|------------|-----------|-------------|
+| 1 | `\|>` | Pipeline |
+| 2 | `>>` | Function composition |
+| 3 | `\|\|` | Logical OR |
+| 4 | `&&` | Logical AND |
+| 5-6 | `==` `!=` `<` `>` `<=` `>=` | Equality and comparison |
+| 7 | `++` `<>` | Concatenation / Append |
+| 8 | `+` `-` | Additive |
+| 9 | `*` `/` `%` | Multiplicative |
+| 10 | `-` `!` | Unary prefix |
+| 11 | `?` | Postfix error propagation |
+| 12 | `.` application | Field access, function call |
+
+### Error Recovery
+
+The parser implements **synchronization-point recovery**:
+
+1. When an error is encountered, the parser records a diagnostic.
+2. It advances tokens until it finds a synchronization point (`fn`, `type`, `let`, `module`, `import`, `test`, `|`, `Dedent`, or `Newline` at zero indentation).
+3. An `ErrorNode` placeholder is inserted into the AST.
+4. Parsing continues, allowing multiple errors per compilation without cascading.
+
+### AST Structure
+
+The AST represents the full syntactic structure of JAPL programs. Key node types include:
+
+- `SourceFile` -- a complete source file with module declaration, imports, and items
+- `FnDef` -- function definition with type parameters, parameters, return type, effects, and body
+- `TypeDef` -- type definition (sum types, records, capability types)
+- `TraitDef` / `ImplBlock` -- trait definitions and implementations
+- `Expr` -- the expression tree (let, use, match, if, lambda, pipe, compose, etc.)
+- `Pattern` -- pattern tree (constructor, record, list, literal, wildcard, pin)
+
+## Type Checker (japl-checker)
+
+The `japl-checker` crate houses four sequential passes that share a common context and type representation.
+
+### Pass 1: Name Resolution
+
+Before type checking, all identifiers must be resolved to their definitions. The resolver builds a scope tree and maps each `NodeId` in the AST to a `Resolution` (local variable, top-level definition, constructor, module, trait, etc.).
+
+```rust
+pub enum Resolution {
+    Local(DefId),
+    TopLevel(DefId),
+    Constructor(DefId),
+    Module(DefId),
+    Trait(DefId),
+    TypeParam(DefId),
+    Foreign(DefId),
+    Builtin(BuiltinId),
+}
+```
+
+### Pass 2: Type Checking
+
+The type checker uses **bidirectional type checking** with three judgment modes:
+
+1. **Check:** Push an expected type down into an expression.
+2. **Infer:** Synthesize a type for an expression.
+3. **Subsumption:** Verify that an inferred type is at least as general as expected.
+
+The core algorithm is Hindley-Milner with extensions:
+
+- **Unification** uses union-find extended for row polymorphism and effect rows.
+- **Row unification** handles structural record types by matching common fields, binding row variables to remainders.
+- **Instantiation** replaces universally quantified type variables with fresh unification variables.
+- **Generalization** closes over free unification variables to create polymorphic type schemes.
+
+Types are interned in a `TypeInterner` for O(1) equality comparison:
+
+```rust
+pub struct TypeInterner {
+    types: Vec<Type>,
+    map: HashMap<Type, TypeId>,
+}
+```
+
+### Pass 3: Effect Checking
+
+Effects are checked as part of the function type. The effect checker verifies that calling a function with effect row `callee_effects` is legal in a context that allows `context_effects`. For each concrete effect in the callee's row, it must appear in the context's row (or the context must have an open row variable that can absorb it).
+
+Effect handlers (`State.run`, `Fail.catch`) discharge effects, removing them from the row.
+
+### Pass 4: Linearity Checking
+
+The linearity checker verifies that all `Owned` and `use`-bound resources are consumed exactly once. It maintains a linear context tracking each resource's status:
+
+- **Available** -- can be used or consumed
+- **Consumed** -- has been moved or closed (use again = compile error)
+- **Borrowed** -- temporarily lent via `ref` (cannot consume while borrowed)
+
+For branching expressions (`if`, `match`), all branches must agree on resource consumption. If one branch consumes a resource and another does not, the checker reports an error.
+
+### Trait Resolution
+
+At each call site requiring a trait, the compiler searches for a matching `impl`:
+
+1. Look for a direct `impl` for the concrete type.
+2. Look for a parametric `impl` matching the type structure.
+3. If a `where` clause introduces the constraint, use the dictionary passed by the caller.
+
+Overlapping implementations are a compile error, ensuring deterministic resolution.
+
+### Error Messages
+
+Type errors include the expected and inferred types, the source span, and suggestions for common mistakes:
+
+```
+error[E0012]: type mismatch
+  --> src/main.japl:23:10
+   |
+23 |   let x: Int = parse_config(path)
+   |          ^^^   ^^^^^^^^^^^^^^^^^^
+   |          |     this has type Result[Config, ParseError]
+   |          expected Int
+   |
+   = note: Result[Config, ParseError] != Int
+   = help: use `?` to propagate the error: parse_config(path)?
+```
+
+## IR Design (japl-ir)
+
+The Mid-Level IR (MIR) is a lowered representation that makes control flow explicit, eliminates pattern matching via decision trees, and makes closures explicit.
+
+### MIR Structure
+
+A `MirFunction` contains basic blocks, each consisting of a sequence of statements and a terminator:
+
+- **Statements:** Assignments, drops, no-ops
+- **Terminators:** Returns, gotos, branches, switches, calls, tail calls, send, receive, spawn, crash
+
+### Optimization Passes
+
+Passes run in this order on each `MirFunction`:
+
+| Pass | Description |
+|------|-------------|
+| **Monomorphization** | Specialize generic functions for each concrete type combination |
+| **Closure Conversion** | Convert closures to `{fn_ptr, env_ptr}` pairs |
+| **Pattern Match Compilation** | Convert complex patterns into optimal decision trees (Maranget's algorithm) |
+| **Inlining** | Inline small functions below a cost threshold |
+| **Constant Folding** | Evaluate operations on known constants at compile time |
+| **Dead Code Elimination** | Remove unreachable blocks and unused pure assignments |
+| **Tail Call Optimization** | Convert self-recursive tail calls to jumps |
+| **Common Subexpression Elimination** | Deduplicate identical computations via value numbering |
+
+The optimization pipeline is implemented as a trait:
+
+```rust
+pub trait MirPass {
+    fn name(&self) -> &str;
+    fn run(&self, func: &mut MirFunction, interner: &TypeInterner);
+}
+```
+
+## Code Generation (japl-codegen)
+
+### Dual Backend Strategy
+
+| Mode | Backend | Use Case |
+|------|---------|----------|
+| Dev (`japl build`) | **Cranelift** | Fast compilation (~5x faster than LLVM) for development |
+| Release (`japl build --release`) | **LLVM** (via `inkwell`) | Maximum optimization for production |
+
+Both backends consume the same optimized MIR.
+
+### Calling Convention
+
+JAPL uses a custom calling convention that accommodates the process-based runtime. Every function receives a hidden first argument: a pointer to the current Process Context (scheduler handle, mailbox pointer, heap pointer, reduction counter). After a configurable number of function calls, the process yields to the scheduler, ensuring fairness.
+
+### Data Layout
+
+- **Records:** Fields laid out in declaration order with alignment padding
+- **Tagged unions:** Tag byte followed by aligned payload. Option[Ref[T]] is optimized to use null for None
+- **Closures:** `{fn_ptr, env_ptr}` pair. Non-capturing lambdas optimized to bare function pointers
+- **Packed types:** Contiguous layout with no indirection
+
+## Runtime System (japl-runtime)
+
+The runtime is a Rust library linked into every JAPL binary:
+
+- **Process Scheduler:** M:N threading with work-stealing. Each OS thread maintains a local run queue. Idle workers steal from busy workers.
+- **Per-Process GC:** Generational, copying collector for nursery (young generation), mark-compact for old generation. No write barriers needed (immutable data). Process death reclaims the entire heap instantly.
+- **Resource Arena:** Deterministic cleanup of linear resources. On process death, all remaining resources are destroyed.
+- **Mailbox:** Lock-free MPSC queue (crossbeam). Selective receive via save queue.
+- **Supervision Tree:** Runtime implementation of restart strategies with restart intensity tracking.
+- **Distribution Layer:** TCP-based node mesh with cookie authentication, binary wire protocol, and process registry.
+
+## Crate Architecture
+
+```
+japl-ast        -- Span, FileId, Diagnostic, NodeId
+japl-lexer      -- Token stream (depends on logos, japl-ast)
+japl-parser     -- Untyped AST (depends on japl-lexer, japl-ast)
+japl-types      -- Type, TypeId, TypeInterner, EffectRow
+japl-checker    -- Name resolution, type/effect/linearity checking
+japl-ir         -- MIR, optimization passes
+japl-codegen    -- Cranelift + LLVM backends, linker
+japl-runtime    -- Scheduler, GC, mailbox, supervisor, distribution
+japl-stdlib     -- Standard library (initially in Rust, progressively rewritten in JAPL)
+japl-driver     -- CLI entry point, orchestrates the pipeline
+```
+
+> **Comparison with Other Languages**
+>
+> **Rust (rustc):** Uses a similar pipeline (lexer, parser, HIR, MIR, LLVM). JAPL's architecture is directly inspired by rustc but simplified (no borrow checker pass, simpler MIR). The Pratt + recursive descent parser is the same hybrid used by `rustc` and `rust-analyzer`.
+>
+> **Go:** The Go compiler is known for fast compilation. JAPL follows this priority by using Cranelift for dev builds and reserving LLVM for release builds.
+>
+> **Haskell (GHC):** GHC uses the STG machine and Core intermediate representation. JAPL's MIR serves a similar role to Core but with explicit control flow (basic blocks) rather than a functional IR.
+
+## Contributing
+
+### Building the Compiler
+
+```
+$ git clone https://github.com/YonedaAI/japl.git
+$ cd japl
+$ cargo build
+```
+
+### Running Tests
+
+```
+$ cargo test                    -- all unit tests
+$ cargo test -p japl-lexer      -- lexer tests only
+$ cargo test -p japl-parser     -- parser tests only
+$ cargo test -p japl-checker    -- type checker tests only
+```
+
+### Adding a New Optimization Pass
+
+1. Define a struct implementing `MirPass` in `japl-ir/src/optimize/`.
+2. Implement the `name()` and `run()` methods.
+3. Add the pass to the `default_pipeline()` in `japl-ir/src/optimize.rs`.
+4. Add tests in the same module.
+
+### Adding a New Language Feature
+
+1. Add tokens to `japl-lexer/src/token.rs`.
+2. Add AST nodes to `japl-ast/src/ast.rs`.
+3. Add parsing rules to `japl-parser/src/lib.rs`.
+4. Add type representations to `japl-types/src/lib.rs`.
+5. Add type checking rules to `japl-checker/src/typecheck.rs`.
+6. Add MIR lowering to `japl-ir/src/lower.rs`.
+7. Add codegen to `japl-codegen/src/`.
+8. Add tests at each stage.
+
+## Best Practices for Compiler Development
+
+**Write tests at every stage.** Each crate should have comprehensive tests. Lexer tests check tokenization, parser tests check AST structure, type checker tests check type inference and error messages, and end-to-end tests check the complete pipeline.
+
+**Use structured diagnostics.** Every error should carry a source span, a severity level, and (when possible) a fix suggestion. Good error messages are a feature of the language, not an afterthought.
+
+**Keep passes independent.** Each pass should consume and produce well-defined data structures. This makes passes testable in isolation and allows reordering or disabling passes without cascading changes.
+
+**Intern aggressively.** Use `TypeId` (interned type), `SmolStr` (interned string), and `DefId` (definition ID) throughout the compiler. This makes equality comparisons O(1) and reduces memory allocation.
+
+**Profile before optimizing.** Use `cargo flamegraph` and `cargo bench` to identify actual bottlenecks. The compiler's performance matters -- fast compilation is a language feature.

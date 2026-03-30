@@ -1,0 +1,208 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+---
+<BaseLayout title="Pipes & Composition" description="Pipe-forward operator and higher-order functions for data transformation pipelines in JAPL.">
+  <Nav />
+
+  <article class="example-page">
+    <div class="container">
+      <a href="/examples" class="back-link">&larr; All Examples</a>
+      <span class="example-tag">FP</span>
+      <h1>Pipes & Composition</h1>
+      <p class="example-intro">JAPL's pipe-forward operator <code>|&gt;</code> lets data flow left-to-right through function chains. Combined with higher-order functions, this enables expressive, readable data transformations.</p>
+
+      <h2>Source Code: Pipes</h2>
+      <pre class="code-block"><code>fn double(x: Int) -> Int {'{'} x * 2 {'}'}
+fn add(x: Int, y: Int) -> Int {'{'} x + y {'}'}
+fn to_str(x: Int) -> String {'{'} show(x) {'}'}
+
+fn main() {'{'}
+  let result = 5 |&gt; double |&gt; double
+  println(show(result))
+
+  let msg = 42 |&gt; to_str
+  println(msg)
+{'}'}</code></pre>
+
+      <h2>Source Code: Higher-Order Functions</h2>
+      <pre class="code-block"><code>fn apply(f: fn(Int) -> Int, x: Int) -> Int {'{'} f(x) {'}'}
+fn double(x: Int) -> Int {'{'} x * 2 {'}'}
+fn square(x: Int) -> Int {'{'} x * x {'}'}
+
+fn apply_twice(f: fn(Int) -> Int, x: Int) -> Int {'{'} f(f(x)) {'}'}
+
+fn main() {'{'}
+  println(show(apply(double, 5)))
+  println(show(apply(square, 4)))
+  println(show(apply_twice(double, 3)))
+  let add_ten = fn(x: Int) {'{'} x + 10 {'}'}
+  println(show(apply(add_ten, 5)))
+{'}'}</code></pre>
+
+      <h2>What This Demonstrates</h2>
+      <ul>
+        <li><strong>Pipe-forward operator <code>|&gt;</code></strong> -- Passes the left-hand value as the first argument to the right-hand function. <code>5 |&gt; double</code> is equivalent to <code>double(5)</code>.</li>
+        <li><strong>Chained pipes</strong> -- Multiple pipes compose left-to-right: <code>5 |&gt; double |&gt; double</code> computes <code>double(double(5))</code> = <code>20</code>.</li>
+        <li><strong>Functions as values</strong> -- Functions can be passed as arguments. <code>apply(double, 5)</code> calls <code>double</code> with <code>5</code>.</li>
+        <li><strong>Function types</strong> -- <code>fn(Int) -> Int</code> is the type of a function taking an <code>Int</code> and returning an <code>Int</code>.</li>
+        <li><strong>Anonymous functions</strong> -- <code>fn(x: Int) {'{'} x + 10 {'}'}</code> creates an inline function (lambda) without naming it.</li>
+        <li><strong>Applying functions multiple times</strong> -- <code>apply_twice</code> demonstrates that higher-order functions can express powerful abstractions concisely.</li>
+      </ul>
+
+      <h2>Line-by-Line Breakdown</h2>
+      <dl class="breakdown">
+        <dt><code>let result = 5 |&gt; double |&gt; double</code></dt>
+        <dd>Starts with <code>5</code>, pipes it into <code>double</code> (getting <code>10</code>), then pipes that into <code>double</code> again (getting <code>20</code>). Reads left-to-right, like a Unix pipeline.</dd>
+
+        <dt><code>fn apply(f: fn(Int) -> Int, x: Int) -> Int</code></dt>
+        <dd>Takes a function <code>f</code> and a value <code>x</code>, and applies <code>f</code> to <code>x</code>. The function type is written <code>fn(Int) -> Int</code>.</dd>
+
+        <dt><code>fn apply_twice(f: fn(Int) -&gt; Int, x: Int) -&gt; Int {'{'} f(f(x)) {'}'}</code></dt>
+        <dd>Applies <code>f</code> twice. <code>apply_twice(double, 3)</code> computes <code>double(double(3))</code> = <code>12</code>.</dd>
+
+        <dt><code>let add_ten = fn(x: Int) {'{'} x + 10 {'}'}</code></dt>
+        <dd>An anonymous function bound to a local variable. It can be passed to <code>apply</code> just like a named function.</dd>
+      </dl>
+
+      <h2>Try Modifying</h2>
+      <ul class="try-list">
+        <li>Build a longer pipeline: <code>5 |&gt; double |&gt; square |&gt; to_str</code> and print the result.</li>
+        <li>Write a <code>compose</code> function that takes two functions and returns their composition.</li>
+        <li>Create a <code>map</code> function that applies a function to each element of a list.</li>
+        <li>Use anonymous functions directly in a pipe: <code>5 |&gt; fn(x: Int) {'{'} x * 3 {'}'}</code>.</li>
+      </ul>
+    </div>
+  </article>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  .example-page {
+    padding: 48px 0 80px;
+  }
+
+  .example-page .container {
+    max-width: 780px;
+  }
+
+  .back-link {
+    display: inline-block;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-bottom: 24px;
+    transition: color 0.2s;
+  }
+
+  .back-link:hover {
+    color: var(--accent);
+  }
+
+  .example-tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .example-page h1 {
+    font-size: 2.25rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+  }
+
+  .example-intro {
+    color: var(--text-dim);
+    font-size: 1.05rem;
+    line-height: 1.7;
+    margin-bottom: 40px;
+  }
+
+  .example-page h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin-top: 48px;
+    margin-bottom: 16px;
+  }
+
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    overflow-x: auto;
+    font-size: 0.875rem;
+    line-height: 1.75;
+    color: var(--text-dim);
+  }
+
+  .example-page ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .example-page ul li {
+    position: relative;
+    padding-left: 20px;
+    margin-bottom: 12px;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  .example-page ul li::before {
+    content: '\2022';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .breakdown {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+  }
+
+  .breakdown dt {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--accent);
+    margin-top: 16px;
+  }
+
+  .breakdown dt:first-child {
+    margin-top: 0;
+  }
+
+  .breakdown dd {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-left: 0;
+    margin-top: 4px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .breakdown dd:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  @media (max-width: 640px) {
+    .example-page {
+      padding: 32px 0 48px;
+    }
+
+    .example-page h1 {
+      font-size: 1.75rem;
+    }
+  }
+</style>

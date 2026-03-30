@@ -1,0 +1,357 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+
+const papers = [
+  {
+    num: "I",
+    title: "Values Are Primary",
+    description: "Immutable data, algebraic types, and pattern matching.",
+    pdf: "values-are-primary.pdf",
+  },
+  {
+    num: "II",
+    title: "Mutation Is Local and Explicit",
+    description: "Linear types, ownership, confined mutability.",
+    pdf: "mutation-is-local.pdf",
+  },
+  {
+    num: "III",
+    title: "Process-Based Concurrency",
+    description: "Lightweight processes, typed messages, supervision.",
+    pdf: "process-concurrency.pdf",
+  },
+  {
+    num: "IV",
+    title: "Typed Failures",
+    description: "Error values, result types, recovery strategies.",
+    pdf: "typed-failures.pdf",
+  },
+  {
+    num: "V",
+    title: "Native Distribution",
+    description: "Location-transparent processes, typed protocols.",
+    pdf: "native-distribution.pdf",
+  },
+  {
+    num: "VI",
+    title: "Function Composition",
+    description: "Pipelines, higher-order functions, algebraic effects.",
+    pdf: "function-composition.pdf",
+  },
+  {
+    num: "VII",
+    title: "Runtime Simplicity",
+    description: "Minimal runtime, compile-time reasoning.",
+    pdf: "runtime-simplicity.pdf",
+  },
+];
+
+const dnaTypes = [
+  {
+    code: "ProteinCode",
+    mapping: "Functions",
+    description: "Executable code -- the fundamental units of computation.",
+  },
+  {
+    code: "Regulator",
+    mapping: "Effects",
+    description: "Control flow and scheduling -- determines when and how code executes.",
+  },
+  {
+    code: "RNAControl",
+    mapping: "Signals",
+    description: "Interrupts and modifiers -- runtime events that alter execution paths.",
+  },
+  {
+    code: "Structure",
+    mapping: "Types",
+    description: "Memory layout and architecture -- the shape of data at rest.",
+  },
+  {
+    code: "Repeat",
+    mapping: "Macros",
+    description: "Self-modifying and dynamic -- code that generates other code.",
+  },
+  {
+    code: "Epigenetic",
+    mapping: "State",
+    description: "Runtime state and permissions -- mutable context governed by the type system.",
+  },
+  {
+    code: "Developmental",
+    mapping: "Programs",
+    description: "High-level orchestrators -- compositions that emerge from simpler parts.",
+  },
+];
+---
+<BaseLayout title="Research" description="The design papers and theoretical foundations behind the JAPL programming language.">
+  <Nav />
+
+  <section class="research-hero">
+    <div class="container">
+      <h1 class="page-title">Research</h1>
+      <p class="page-desc">JAPL is designed from first principles. These papers document the rationale behind each core language decision.</p>
+    </div>
+  </section>
+
+  <section class="papers-section">
+    <div class="container">
+      <h2 class="section-title">Design Papers</h2>
+      <p class="section-desc">Seven papers covering JAPL's type system, ownership model, concurrency, error handling, distribution, composition, and runtime.</p>
+      <div class="papers-grid">
+        {papers.map((paper) => (
+          <a href={`https://github.com/YonedaAI/japl/blob/main/papers/pdf/${paper.pdf}`} class="paper-card" target="_blank" rel="noopener">
+            <span class="paper-num">{paper.num}</span>
+            <h3>{paper.title}</h3>
+            <p>{paper.description}</p>
+            <span class="paper-link">View PDF &rarr;</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="foundations-section">
+    <div class="container">
+      <h2 class="section-title">Foundations</h2>
+      <p class="section-desc">JAPL's design is informed by category theory and a biological analogy for type classification.</p>
+
+      <div class="foundation-block">
+        <h3>Category Theory & the Yoneda Lemma</h3>
+        <p>JAPL's type system is grounded in the insight from the Yoneda lemma: an object is fully characterized by its relationships to all other objects. In practice, this means a type in JAPL is defined by how it can be constructed, destructured, and transformed -- not by an internal representation. This principle drives the design of algebraic data types, pattern matching, and trait-based polymorphism throughout the language.</p>
+      </div>
+
+      <div class="foundation-block">
+        <h3>DNA-Inspired Type Classification</h3>
+        <p>JAPL maps biological DNA classifications to programming language constructs, revealing structural parallels between genetic systems and type systems.</p>
+        <div class="dna-table">
+          <div class="dna-header">
+            <span>DNA Class</span>
+            <span>Language Construct</span>
+            <span>Role</span>
+          </div>
+          {dnaTypes.map((d) => (
+            <div class="dna-row">
+              <span class="dna-code">{d.code}</span>
+              <span class="dna-mapping">{d.mapping}</span>
+              <span class="dna-desc">{d.description}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  .research-hero {
+    padding: 80px 0 48px;
+    text-align: center;
+  }
+
+  .page-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+  }
+
+  .page-desc {
+    color: var(--text-dim);
+    max-width: 600px;
+    margin: 0 auto;
+    font-size: 1.05rem;
+  }
+
+  .papers-section {
+    padding: 0 0 80px;
+  }
+
+  .section-title {
+    font-size: 2rem;
+    font-weight: 800;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  .section-desc {
+    text-align: center;
+    color: var(--text-dim);
+    max-width: 600px;
+    margin: 0 auto 48px;
+  }
+
+  .papers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+  }
+
+  .paper-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    transition: border-color 0.2s;
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+  }
+
+  .paper-card:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .paper-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin-bottom: 16px;
+  }
+
+  .paper-card h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+
+  .paper-card p {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-bottom: 16px;
+    flex: 1;
+  }
+
+  .paper-link {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  /* Foundations */
+  .foundations-section {
+    padding: 80px 0 100px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+
+  .foundation-block {
+    max-width: 780px;
+    margin: 0 auto 48px;
+  }
+
+  .foundation-block:last-child {
+    margin-bottom: 0;
+  }
+
+  .foundation-block h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--text);
+  }
+
+  .foundation-block > p {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    line-height: 1.7;
+    margin-bottom: 24px;
+  }
+
+  .dna-table {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .dna-header {
+    display: grid;
+    grid-template-columns: 140px 140px 1fr;
+    gap: 16px;
+    padding: 12px 20px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+
+  .dna-row {
+    display: grid;
+    grid-template-columns: 140px 140px 1fr;
+    gap: 16px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+    align-items: baseline;
+  }
+
+  .dna-row:last-child {
+    border-bottom: none;
+  }
+
+  .dna-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .dna-mapping {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .dna-desc {
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  @media (max-width: 640px) {
+    .research-hero {
+      padding: 48px 0 32px;
+    }
+
+    .page-title {
+      font-size: 1.75rem;
+    }
+
+    .papers-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .dna-header,
+    .dna-row {
+      grid-template-columns: 1fr;
+      gap: 4px;
+    }
+
+    .dna-header {
+      display: none;
+    }
+
+    .dna-row {
+      padding: 16px 20px;
+    }
+
+    .dna-code::after {
+      content: ' \2192';
+    }
+  }
+</style>

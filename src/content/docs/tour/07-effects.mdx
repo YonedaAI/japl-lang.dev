@@ -1,0 +1,130 @@
+---
+title: "Effects"
+description: "Learn how JAPL tracks side effects in the type system with effect annotations."
+status: "preview"
+order: 7
+section: "tour"
+prev: { title: "Pipes & Composition", slug: "docs/tour/06-pipes" }
+next: { title: "Processes", slug: "docs/tour/08-processes" }
+---
+
+# Effects
+
+JAPL tracks computational side effects in function signatures. A pure function has no annotation. An effectful function declares its effects after the `with` keyword. The compiler enforces these annotations, so you always know whether a function reads files, sends network requests, or spawns processes just by reading its type.
+
+## Pure Functions
+
+Most functions are pure -- they take values in and produce values out with no side effects. Pure functions need no effect annotation:
+
+```japl
+fn add(a: Int, b: Int) -> Int =
+  a + b
+
+fn double(x: Int) -> Int { x * 2 }
+```
+
+Pure functions are deterministic, easy to test, and safe to call from anywhere.
+
+## Effect Annotations
+
+When a function performs side effects, it declares them with `with`:
+
+```japl
+fn read_config(path: String) -> Config with Io =
+  let text = File.read_to_string(path)?
+  parse_config(text)?
+```
+
+The `with Io` annotation tells the caller and the compiler that this function interacts with the outside world.
+
+## Built-in Effects
+
+JAPL provides a set of base effects:
+
+| Effect | Meaning |
+|--------|---------|
+| `Pure` | No effects (default, not written) |
+| `Io` | File system, console, clock, random |
+| `Net` | Network access |
+| `State[s]` | Mutable state of type `s` |
+| `Process` | Process spawn, send, receive |
+| `Fail[e]` | May fail with error type `e` |
+| `Async` | Asynchronous operations |
+
+## Combining Effects
+
+Functions can declare multiple effects, separated by commas:
+
+```japl
+fn handler(req: Request) -> Response with Io, Net =
+  let config = read_config("/etc/app.conf")?
+  let data = Http.get(config.data_url)?
+  process_response(data)
+```
+
+This signature tells you at a glance that `handler` performs IO (reads config from disk) and network access (makes an HTTP request).
+
+## Effect Propagation
+
+Effects compose and propagate through the call chain. A function's effect signature is the union of all effects it transitively invokes. The compiler infers effects locally and checks them at module boundaries:
+
+```japl
+-- read_config has effect: Io, Fail[ConfigError]
+-- Http.get has effect: Net
+-- handler's effects = Io + Net + Fail[AppError]
+fn handler(req: Request) -> Response with Io, Net, Fail[AppError] =
+  let config = read_config("/etc/app.conf")?
+  let data = Http.get(config.data_url)?
+  process_response(data)
+```
+
+If you call an effectful function inside a pure function, the compiler reports a type error. Effects cannot be hidden.
+
+## State Effect
+
+The `State[s]` effect provides mutable state scoped to a computation. You run it with an initial value, and the effect is contained:
+
+```japl
+fn accumulate(items: List[Int]) -> Int with State[Int] =
+  List.each items (fn x -> State.modify (fn acc -> acc + x))
+  State.get()
+
+fn main() -> Unit with Io =
+  let result = State.run(0, fn ->
+    accumulate([1, 2, 3, 4, 5])
+  )
+  println(show(result))  -- prints 15
+```
+
+The `State.run` call provides the effect handler. Inside the handler, `State.modify` and `State.get` are available. Outside it, the state effect is discharged and the result is a plain value.
+
+## Process Effect
+
+Functions that spawn or communicate with processes declare the `Process` effect:
+
+```japl
+fn worker(state: WorkerState) -> Never with Process[WorkerMsg] =
+  match Process.receive() with
+  | DoWork(task, reply) ->
+      let result = execute_task(state, task)
+      Reply.send(reply, result)
+      worker(state)
+  | Shutdown ->
+      cleanup(state)
+      Process.exit(Normal)
+```
+
+The `Process[WorkerMsg]` annotation specifies both that this function uses process operations and the type of messages its mailbox accepts.
+
+## Why Track Effects?
+
+Effect tracking gives you several guarantees:
+
+- **Readability**: A function's signature tells you everything it can do.
+- **Safety**: Pure code cannot accidentally perform IO or mutate state.
+- **Testability**: Pure functions are trivially testable. Effectful functions can be tested by providing mock effect handlers.
+- **Refactoring**: The compiler catches you if a refactoring accidentally introduces a new effect.
+
+## Next Steps
+
+The most important effect in JAPL is process-based concurrency. Learn how to spawn and communicate with processes in [Processes](/docs/tour/08-processes).

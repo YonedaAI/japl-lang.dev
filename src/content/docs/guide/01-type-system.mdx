@@ -1,0 +1,249 @@
+---
+title: "Type System"
+description: "Deep dive into JAPL's Hindley-Milner inference, parametric polymorphism, row polymorphism, type constructors, and type aliases."
+status: "stable"
+order: 1
+section: "guide"
+next: { title: "Ownership & Linearity", slug: "guide/02-ownership" }
+---
+
+# Type System
+
+JAPL's type system is the foundation on which every other language feature rests. It is a static, strong, parametrically polymorphic type system with bidirectional local type inference, algebraic data types, row polymorphism, traits, effect types, and linear resource types. The goal is simple: catch as many errors as possible at compile time without drowning the programmer in annotations.
+
+The type system draws from the Hindley-Milner tradition but extends it with row polymorphism for records and effects, trait-based ad-hoc polymorphism, and a linear resource layer. The result is a system where most code needs no type annotations beyond top-level function signatures, yet the compiler can verify correctness across process boundaries, effect boundaries, and ownership transfers.
+
+## Primitive Types
+
+JAPL provides a small set of built-in primitive types. All primitives are immutable and freely copyable.
+
+| Type | Description | Representation |
+|------|-------------|----------------|
+| `Int` | Arbitrary-precision integer | Bignum (small ints unboxed) |
+| `Float` | 64-bit IEEE 754 double precision | 8 bytes |
+| `Float32` | 32-bit IEEE 754 single precision | 4 bytes |
+| `Bool` | Boolean: `True` or `False` | 1 byte (tagged) |
+| `Char` | Unicode scalar value | 4 bytes |
+| `String` | Immutable UTF-8 encoded string | Pointer + length |
+| `Bytes` | Immutable raw byte sequence | Pointer + length |
+| `Unit` | The unit type; sole value `()` | Zero-size |
+| `Never` | The bottom type; no values | Uninhabited |
+
+```japl
+let count = 42           -- Int
+let pi = 3.14159         -- Float
+let name = "JAPL"        -- String
+let active = True        -- Bool
+let nothing = ()         -- Unit
+```
+
+## Algebraic Data Types
+
+JAPL provides two fundamental forms of composite types: sum types (tagged unions) and product types (records).
+
+### Sum Types
+
+Sum types define a closed set of variants. Each variant is a constructor that may carry typed payloads. The compiler enforces exhaustive pattern matching on sum types, which means you can never forget to handle a case.
+
+```japl
+type Shape =
+  | Circle(Float)
+  | Rectangle(Float, Float)
+  | Triangle(Float, Float, Float)
+
+type Option[a] =
+  | Some(a)
+  | None
+
+type Result[a, e] =
+  | Ok(a)
+  | Err(e)
+```
+
+Pattern matching forces you to handle every variant:
+
+```japl
+fn area(shape: Shape) -> Float =
+  match shape with
+  | Circle(r) -> 3.14159 * r * r
+  | Rectangle(w, h) -> w * h
+  | Triangle(a, b, c) ->
+      let s = (a + b + c) / 2.0
+      Float.sqrt(s * (s - a) * (s - b) * (s - c))
+```
+
+### Product Types (Records)
+
+Records are structurally typed, labeled product types. They are created with `=` syntax and accessed with `.` notation.
+
+```japl
+type User = {
+  id: Int,
+  name: String,
+  email: String,
+}
+
+let alice = { id = 1, name = "Alice", email = "alice@example.com" }
+let user_name = alice.name
+```
+
+Record update syntax creates a new record with modified fields. The original record is unchanged, preserving immutability:
+
+```japl
+let updated = { alice | name = "Alice Smith" }
+```
+
+### Packed Types
+
+The `packed` qualifier requests a contiguous memory layout with no pointer indirection, enabling cache-friendly data-oriented designs:
+
+```japl
+type Vec3 = packed { x: Float32, y: Float32, z: Float32 }
+```
+
+Packed types must contain only fixed-size types -- no polymorphic fields or heap-allocated types.
+
+## Parametric Polymorphism
+
+JAPL supports parametric polymorphism (generics) using type variables denoted by lowercase identifiers. Type variables are implicitly universally quantified at the function level.
+
+```japl
+fn identity[a](x: a) -> a = x
+
+fn map[a, b](list: List[a], f: fn(a) -> b) -> List[b] =
+  match list with
+  | [] -> []
+  | [x, ..rest] -> [f(x), ..map(rest, f)]
+
+fn const[a, b](x: a, _y: b) -> a = x
+```
+
+JAPL provides a **parametricity guarantee** (free theorem): a polymorphic function cannot inspect or branch on the runtime representation of a type variable. This means `identity : a -> a` can only be the identity function -- there is no other valid implementation. This property makes polymorphic code dramatically easier to reason about.
+
+## Type Inference
+
+JAPL uses bidirectional type checking with local inference based on Hindley-Milner with extensions for row polymorphism and effect types. The inference algorithm is decidable and runs in linear time for practical programs.
+
+The rules are straightforward:
+
+1. **Top-level function signatures are required** at module boundaries. This ensures separate compilation and serves as documentation.
+2. **Within function bodies, types are inferred.** Local let-bindings, lambda parameters, and intermediate expressions have their types inferred automatically.
+3. **Type annotations may appear anywhere** for documentation or disambiguation.
+
+```japl
+-- Signature required at module boundary
+fn process(items: List[Item]) -> Summary with Io =
+  -- Types inferred within the body
+  let totals = List.map(items, fn item -> item.price * item.quantity)
+  let sum = List.fold(totals, 0, fn acc, t -> acc + t)
+  { item_count = List.length(items), total = sum }
+```
+
+The bidirectional algorithm operates in two modes:
+
+- **Checking mode:** Given an expected type, verify that an expression has that type.
+- **Synthesis mode:** Given an expression, compute its type.
+
+This dual approach gives you the best of both worlds: explicit types where you want documentation, and inferred types where the code speaks for itself.
+
+## Row Polymorphism
+
+Records in JAPL are structurally typed with row polymorphism. A row variable represents "the rest of the fields," enabling functions that work on any record containing specific fields.
+
+```japl
+fn get_name(r: { name: String | rest }) -> String =
+  r.name
+```
+
+The type `{ name: String | rest }` matches any record that has at least a `name: String` field. The row variable `rest` captures the remaining fields, whatever they may be.
+
+```japl
+-- All of these calls are valid:
+get_name({ name = "Alice" })
+get_name({ name = "Bob", age = 30 })
+get_name({ name = "Charlie", role = Admin, email = "c@b.com" })
+```
+
+Row polymorphism extends to record updates as well. If `e : { l: T1, ... | r }`, then `{ e | l = e2 }` produces a record with the updated field while preserving all other fields captured by the row variable.
+
+> **Comparison with Other Languages**
+>
+> Row polymorphism occupies a sweet spot between nominal typing (Rust, Java) and fully structural typing (TypeScript). Unlike Rust, where you need to define a trait to abstract over records with a certain field, JAPL lets you write functions that work on any record with the right shape. Unlike TypeScript, JAPL's row polymorphism is formally sound -- there is no `any` escape hatch, and the type checker fully tracks which fields are present.
+
+## Type Aliases and Opaque Types
+
+**Type aliases** create synonyms with no abstraction boundary. They are purely for readability:
+
+```japl
+type alias Headers = Map[String, String]
+type alias UserId = Int
+```
+
+**Opaque types** hide their representation outside the defining module, providing encapsulation equivalent to private fields in object-oriented languages:
+
+```japl
+module Map =
+  opaque type Map[k, v]
+  -- Implementation details hidden from callers
+```
+
+Outside the `Map` module, code cannot inspect or construct `Map[k, v]` values except through the module's public API. This lets library authors change internal representations without breaking downstream code.
+
+## Built-in Type Constructors
+
+JAPL provides several built-in parameterized type constructors:
+
+| Constructor | Kind | Description |
+|-------------|------|-------------|
+| `List` | `Type -> Type` | Singly-linked list |
+| `Option` | `Type -> Type` | Optional value |
+| `Result` | `(Type, Type) -> Type` | Success or failure |
+| `Map` | `(Type, Type) -> Type` | Key-value map |
+| `Set` | `Type -> Type` | Unique element set |
+| `Pid` | `Type -> Type` | Process identifier |
+| `Reply` | `Type -> Type` | One-shot reply channel |
+
+These constructors are used pervasively in JAPL code. For example, `List[Int]` is a list of integers, `Option[String]` is an optional string, and `Pid[CounterMsg]` is a process identifier that accepts `CounterMsg` messages.
+
+## Capability Types
+
+Capabilities are types representing unforgeable permissions to perform actions. They cannot be forged; they must be granted by the runtime or a parent process.
+
+```japl
+type FsCapability = capability {
+  root: Path,
+  permissions: FsPermissions,
+}
+
+fn read_file(cap: FsCapability, path: Path) -> Result[String, IoError] with Io =
+  if Path.is_within(path, cap.root) && cap.permissions.read then
+    File.read_to_string(path)
+  else
+    Err(PermissionDenied)
+```
+
+Capabilities integrate with the effect system to control what operations are available in a given context, enabling fine-grained security policies.
+
+## Best Practices
+
+**Prefer sum types for domain modeling.** Sum types make invalid states unrepresentable. Instead of using boolean flags or nullable fields, encode your domain constraints in the type:
+
+```japl
+-- Instead of:
+-- type User = { name: String, is_admin: Bool, admin_level: Option[Int] }
+
+-- Prefer:
+type UserRole =
+  | Regular
+  | Admin(Int)
+
+type User = { name: String, role: UserRole }
+```
+
+**Use type aliases for domain vocabulary.** Even though `UserId` and `Int` are the same type, giving them distinct names makes code more readable and intent more clear.
+
+**Leverage row polymorphism for reusable utility functions.** Functions like `get_name` or `get_id` that extract common fields should use row-polymorphic types rather than requiring a specific record type.
+
+**Keep type annotations at module boundaries.** Let inference handle the rest. Annotating local bindings is usually unnecessary noise -- add them only when they improve readability or when the inferred type is surprising.
+
+**Use opaque types for API stability.** When designing a library module, hide implementation details behind opaque types. This gives you freedom to change the internal representation without breaking downstream users.

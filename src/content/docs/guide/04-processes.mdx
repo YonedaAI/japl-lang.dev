@@ -1,0 +1,273 @@
+---
+title: "Process Model"
+description: "Deep dive into JAPL's lightweight process lifecycle, scheduling, mailboxes, message passing, and isolation guarantees."
+status: "stable"
+order: 4
+section: "guide"
+prev: { title: "Effect System", slug: "guide/03-effects" }
+next: { title: "Supervision Trees", slug: "guide/05-supervision" }
+---
+
+# Process Model
+
+Concurrency in JAPL is built on a single primitive: the lightweight process. There are no threads, no mutexes, no shared memory. Processes are isolated, communicate through typed message passing, and are scheduled cooperatively by the runtime. This model scales from a single core to a distributed cluster without changing the programming model.
+
+JAPL's process model inherits from Erlang's battle-tested approach but adds static typing to message passing. Every process has a typed mailbox, and the compiler prevents you from sending a message of the wrong type. This catches an entire class of concurrency bugs at compile time that Erlang catches only at runtime.
+
+## Process Properties
+
+JAPL processes have four fundamental properties:
+
+1. **Lightweight.** Each process has a small initial stack (~2KB) that grows as needed. A single node supports millions of concurrent processes.
+2. **Isolated.** Each process has its own heap partition. There is no shared mutable state between processes.
+3. **Preemptively scheduled.** The runtime scheduler uses reduction counting to ensure fairness across processes. No single process can starve others.
+4. **Independently GC'd.** Garbage collection for one process does not pause other processes.
+
+These properties work together to create a concurrency model that is both safe and performant. Isolation eliminates data races. Lightweight creation means you can use processes freely without worrying about resource overhead. Preemptive scheduling ensures responsiveness. Independent GC eliminates pause-time coupling between unrelated work.
+
+## Process Creation
+
+Processes are created with `Process.spawn`, which takes a function and returns a typed process identifier:
+
+```japl
+let pid: Pid[CounterMsg] = Process.spawn(fn -> counter(0))
+```
+
+The type parameter on `Pid` specifies the mailbox message type. This means the compiler knows exactly what messages a process can receive, and it prevents you from sending anything else.
+
+The spawn function has this typing rule: the spawned function must have the `Process[A]` effect and return `Never` (a long-running process loop), and the result is a `Pid[A]`.
+
+### Remote Spawn
+
+Processes can also be spawned on remote nodes:
+
+```japl
+let pid = Process.spawn_on(remote_node, fn -> image_processor())
+```
+
+The returned PID is location-transparent -- you interact with it using exactly the same API as a local PID. See the [Distribution](/docs/guide/06-distribution) chapter for details.
+
+## Message Passing
+
+Communication between processes happens through asynchronous message passing. Messages are typed, and the type system ensures correctness.
+
+### Sending Messages
+
+`Process.send` places a message in the target process's mailbox. Send is asynchronous and non-blocking -- it always succeeds for local processes:
+
+```japl
+Process.send(pid, Increment)
+Process.send(pid, GetCount(reply_channel))
+```
+
+The compiler checks that the message type matches the PID's type parameter. If `pid : Pid[CounterMsg]`, then you can only send `CounterMsg` values to it.
+
+### Receiving Messages
+
+`Process.receive` blocks until a message is available in the current process's mailbox:
+
+```japl
+let msg = Process.receive()
+```
+
+Pattern matching is the natural way to dispatch on message types:
+
+```japl
+match Process.receive() with
+| DoWork(task, reply) ->
+    let result = execute_task(task)
+    Reply.send(reply, result)
+| Shutdown ->
+    cleanup()
+    Process.exit(Normal)
+```
+
+### Receive with Timeout
+
+```japl
+let msg = Process.receive_with_timeout(5000)
+```
+
+Returns `Option[Msg]`: `Some(msg)` if a message arrives within the timeout (in milliseconds), `None` if the timeout expires.
+
+### Selective Receive
+
+Selective receive scans the mailbox for the first message matching a predicate, leaving non-matching messages in place:
+
+```japl
+let urgent = Process.receive_matching(fn msg ->
+  match msg with
+  | Priority(High, _) -> True
+  | _ -> False
+)
+```
+
+This is useful when you need to process high-priority messages before others, without losing the lower-priority messages.
+
+## Typed Mailboxes
+
+Each process has a single mailbox typed by its message type. This is one of JAPL's key improvements over Erlang, where messages are untyped and a runtime error occurs if you send the wrong thing.
+
+```japl
+type CounterMsg =
+  | Increment
+  | Decrement
+  | GetCount(Reply[Int])
+
+fn counter(count: Int) -> Never with Process[CounterMsg] =
+  match Process.receive() with
+  | Increment -> counter(count + 1)
+  | Decrement -> counter(count - 1)
+  | GetCount(reply) ->
+      Reply.send(reply, count)
+      counter(count)
+```
+
+The `Reply[T]` type represents a one-shot reply channel. It is linear: it must be used exactly once. This prevents both double-replies and forgotten replies.
+
+> **Comparison with Other Languages**
+>
+> **Erlang:** Processes and message passing are first-class, but messages are untyped. Pattern matching in `receive` blocks is the only "type check," and it happens at runtime. JAPL adds compile-time type checking while keeping Erlang's programming model.
+>
+> **Go:** Goroutines with channels provide typed communication, but channels are separate from goroutines and shared memory is still accessible. JAPL's processes are fully isolated with no shared memory escape hatch.
+>
+> **Rust:** Concurrency is built on threads and ownership. While safe, it requires understanding lifetimes and send/sync traits. JAPL's process model is simpler: isolation means you never need to think about data races.
+
+## Process State Pattern
+
+Processes manage state through recursive function calls. The process loop is a tail-recursive function that receives a message, computes new state, and calls itself with the updated state. The compiler guarantees tail-call optimization for this pattern, so there is no stack growth.
+
+```japl
+fn server_loop(state: ServerState) -> Never with Process[ServerMsg] =
+  let msg = Process.receive()
+  let new_state = handle_message(state, msg)
+  server_loop(new_state)
+```
+
+This pattern avoids mutable state entirely: each "iteration" creates a new immutable state value. The old state is garbage-collected when no longer referenced. This means that if the process crashes, no state corruption can propagate -- the supervisor simply restarts with fresh initial state.
+
+## Process Lifecycle
+
+A process moves through the following states:
+
+```
+Spawned --> Running --> (Waiting <--> Running) --> Exited(reason)
+```
+
+| State | Description |
+|-------|-------------|
+| `Spawned` | Process created but not yet scheduled |
+| `Running` | Process is executing code |
+| `Waiting` | Process is blocked on `receive` |
+| `Exited(reason)` | Process has terminated |
+
+Exit reasons are either `Normal` (process completed its work) or a crash reason (see [Error Handling](/docs/guide/07-errors)).
+
+## Links and Monitors
+
+JAPL provides two mechanisms for observing process failures:
+
+### Links
+
+Links are bidirectional. If either linked process crashes, the other receives an exit signal:
+
+```japl
+Process.link(pid)
+```
+
+Links are typically used between processes that depend on each other -- if one cannot function without the other, they should be linked.
+
+### Monitors
+
+Monitors are unidirectional. The monitoring process receives a `ProcessDown` message when the monitored process exits, without being affected itself:
+
+```japl
+let ref = Process.monitor(pid)
+
+match Process.receive() with
+| ProcessDown(^ref, ^pid, reason) -> handle_failure(reason)
+```
+
+The `^` pin operator in the pattern ensures that the `ref` and `pid` match the specific values bound earlier, not arbitrary `ProcessDown` messages.
+
+Monitors are used when you need to know about failures but do not want to crash yourself -- for example, a connection pool monitoring its connections.
+
+## Process Introspection
+
+The runtime provides built-in observability for processes:
+
+```japl
+let info = Process.info(pid)
+-- Returns: { status: ProcessStatus, message_queue_len: Int, memory: Int, ... }
+```
+
+This enables building dashboards, debugging tools, and health checks without external instrumentation.
+
+## Scheduling
+
+JAPL's scheduler uses M:N threading with work-stealing. Multiple OS threads (workers) each maintain a run queue of JAPL processes. When a worker's queue is empty, it steals work from other workers.
+
+Each process gets a **reduction budget** (default: 4000 reductions). A reduction is approximately one function call or one basic block. When the budget expires, the process is preempted and placed back on the run queue. This ensures that no single process can monopolize a CPU core.
+
+I/O-bound processes are parked on the I/O reactor (epoll on Linux, kqueue on macOS) and woken when I/O is ready, so they do not consume CPU while waiting.
+
+## Common Patterns
+
+### Request-Reply
+
+Use the `Reply[T]` type for synchronous request-response interactions:
+
+```japl
+type CacheMsg =
+  | Get(String, Reply[Option[String]])
+  | Set(String, String)
+
+fn cache(data: Map[String, String]) -> Never with Process[CacheMsg] =
+  match Process.receive() with
+  | Get(key, reply) ->
+      Reply.send(reply, Map.lookup(data, key))
+      cache(data)
+  | Set(key, value) ->
+      cache(Map.insert(data, key, value))
+```
+
+### Worker Pool
+
+Distribute work across multiple processes:
+
+```japl
+fn start_pool(size: Int) -> List[Pid[WorkerMsg]] with Process =
+  List.map(List.range(1, size), fn _ ->
+    Process.spawn(fn -> worker(initial_state))
+  )
+
+fn distribute(pool: List[Pid[WorkerMsg]], tasks: List[Task]) -> Unit with Process =
+  List.zip(pool, tasks)
+  |> List.each(fn (pid, task) -> Process.send(pid, DoWork(task)))
+```
+
+### Periodic Work
+
+Use receive-with-timeout for periodic tasks:
+
+```japl
+fn heartbeat_loop(interval: Int) -> Never with Process[HeartbeatMsg], Io =
+  match Process.receive_with_timeout(interval) with
+  | Some(Stop) -> Process.exit(Normal)
+  | Some(UpdateInterval(new_interval)) -> heartbeat_loop(new_interval)
+  | None ->
+      send_heartbeat()
+      heartbeat_loop(interval)
+```
+
+## Best Practices
+
+**Use processes for isolation, not parallelism.** Processes are the unit of failure isolation and state encapsulation. If two pieces of state can fail independently, they should be in separate processes.
+
+**Keep message types small and focused.** A process's message type defines its API. Like a function signature, it should be minimal and clear.
+
+**Prefer monitors over links** unless you genuinely want bidirectional failure propagation. Monitors give you failure information without risking cascading crashes.
+
+**Use the process state pattern.** Tail-recursive loops with immutable state are the natural way to manage process state. Avoid the temptation to introduce mutable state inside processes.
+
+**Design for crash recovery.** Because supervisors restart processes with fresh state, ensure that critical state is either persisted externally or can be reconstructed from the process's initial arguments.

@@ -1,0 +1,205 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+---
+<BaseLayout title="Concurrent Counter" description="Lightweight processes with typed message passing in JAPL, inspired by Erlang's actor model.">
+  <Nav />
+
+  <article class="example-page">
+    <div class="container">
+      <a href="/examples" class="back-link">&larr; All Examples</a>
+      <span class="example-tag">Concurrency</span>
+      <h1>Concurrent Counter</h1>
+      <p class="example-intro">A counter running in its own lightweight process, receiving typed messages. This demonstrates JAPL's Erlang-inspired actor model with type-safe message passing.</p>
+
+      <h2>Source Code</h2>
+      <pre class="code-block"><code>type Msg =
+  | Inc
+  | Get
+
+fn counter(n: Int) {'{'}
+  println("Counter value: " &lt;&gt; show(n))
+  receive {'{'}
+    Inc => counter(n + 1)
+    Get => println("Final: " &lt;&gt; show(n))
+  {'}'}
+{'}'}
+
+fn main() {'{'}
+  println("Starting concurrent counter...")
+  let pid = spawn(fn() {'{'} counter(0) {'}'})
+  send(pid, Inc)
+  send(pid, Inc)
+  send(pid, Inc)
+  send(pid, Get)
+  println("Messages sent.")
+{'}'}</code></pre>
+
+      <h2>What This Demonstrates</h2>
+      <ul>
+        <li><strong>Lightweight processes</strong> -- <code>spawn</code> creates a new process that runs concurrently. Processes are cheap, not OS threads.</li>
+        <li><strong>Typed messages</strong> -- The <code>Msg</code> type defines the message protocol. The compiler ensures only valid messages are sent and received.</li>
+        <li><strong>Receive blocks</strong> -- <code>receive</code> blocks the process until a matching message arrives, then pattern-matches on it.</li>
+        <li><strong>Recursive state</strong> -- The counter maintains state by recursing with an updated value. No mutable variables needed.</li>
+        <li><strong>Fire-and-forget sends</strong> -- <code>send</code> is asynchronous; the main process does not wait for a response.</li>
+      </ul>
+
+      <h2>Line-by-Line Breakdown</h2>
+      <dl class="breakdown">
+        <dt><code>type Msg = | Inc | Get</code></dt>
+        <dd>Defines the message protocol for the counter process. Only <code>Inc</code> and <code>Get</code> messages are valid.</dd>
+
+        <dt><code>fn counter(n: Int)</code></dt>
+        <dd>The process function. It prints the current value, then waits for a message.</dd>
+
+        <dt><code>receive {'{'} Inc =&gt; counter(n + 1) ... {'}'}</code></dt>
+        <dd>Blocks until a message arrives. On <code>Inc</code>, it recurses with <code>n + 1</code>, keeping the process alive. On <code>Get</code>, it prints the final value and terminates (no recursive call).</dd>
+
+        <dt><code>let pid = spawn(fn() {'{'} counter(0) {'}'})</code></dt>
+        <dd>Spawns a new process running <code>counter(0)</code>. Returns a process identifier (<code>pid</code>) used to send messages.</dd>
+
+        <dt><code>send(pid, Inc)</code></dt>
+        <dd>Sends an <code>Inc</code> message to the counter process. This is asynchronous -- execution continues immediately.</dd>
+      </dl>
+
+      <h2>Try Modifying</h2>
+      <ul class="try-list">
+        <li>Add a <code>Dec</code> message variant that decrements the counter.</li>
+        <li>Add a <code>Reset</code> variant that sets the counter back to zero.</li>
+        <li>Spawn multiple counters and send messages to each from <code>main</code>.</li>
+        <li>Add a <code>GetAndReply(Pid)</code> variant that sends the current count back to the caller process.</li>
+      </ul>
+    </div>
+  </article>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  .example-page {
+    padding: 48px 0 80px;
+  }
+
+  .example-page .container {
+    max-width: 780px;
+  }
+
+  .back-link {
+    display: inline-block;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-bottom: 24px;
+    transition: color 0.2s;
+  }
+
+  .back-link:hover {
+    color: var(--accent);
+  }
+
+  .example-tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .example-page h1 {
+    font-size: 2.25rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+  }
+
+  .example-intro {
+    color: var(--text-dim);
+    font-size: 1.05rem;
+    line-height: 1.7;
+    margin-bottom: 40px;
+  }
+
+  .example-page h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin-top: 48px;
+    margin-bottom: 16px;
+  }
+
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    overflow-x: auto;
+    font-size: 0.875rem;
+    line-height: 1.75;
+    color: var(--text-dim);
+  }
+
+  .example-page ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .example-page ul li {
+    position: relative;
+    padding-left: 20px;
+    margin-bottom: 12px;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  .example-page ul li::before {
+    content: '\2022';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .breakdown {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+  }
+
+  .breakdown dt {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--accent);
+    margin-top: 16px;
+  }
+
+  .breakdown dt:first-child {
+    margin-top: 0;
+  }
+
+  .breakdown dd {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-left: 0;
+    margin-top: 4px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .breakdown dd:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  @media (max-width: 640px) {
+    .example-page {
+      padding: 32px 0 48px;
+    }
+
+    .example-page h1 {
+      font-size: 1.75rem;
+    }
+  }
+</style>

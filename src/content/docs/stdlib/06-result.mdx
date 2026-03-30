@@ -1,0 +1,132 @@
+---
+title: "Result"
+description: "Reference for the Result standard library module providing typed error handling."
+status: "stable"
+order: 6
+section: "stdlib"
+prev: { title: "Option", slug: "stdlib/05-option" }
+next: { title: "IO", slug: "stdlib/07-io" }
+---
+
+# Result
+
+The `Result` module provides functions for working with computations that may succeed or fail. The `Result` type encodes success and failure as values, enabling typed error handling without exceptions.
+
+## Type Definition
+
+```japl
+type Result =
+  | Ok(Int)
+  | Err(String)
+```
+
+> **Note:** The current stdlib `Result` is specialized to `Ok(Int) | Err(String)`. The language specification defines the polymorphic `Result[a, e] = Ok(a) | Err(e)`, which will be used once the full type system is wired in.
+
+---
+
+## map_result
+
+```japl
+fn map_result(r: Result, f: fn(Int) -> Int) -> Result
+```
+
+Applies a function to the value inside `Ok`, or returns `Err` unchanged. This is the functor `map` operation for `Result`.
+
+### Example
+
+```japl
+map_result(Ok(5), fn(x) { x * 2 })
+-- Ok(10)
+
+map_result(Err("not found"), fn(x) { x * 2 })
+-- Err("not found")
+```
+
+---
+
+## unwrap_or_result
+
+```japl
+fn unwrap_or_result(r: Result, fallback: Int) -> Int
+```
+
+Returns the value inside `Ok`, or the provided fallback if the result is `Err`.
+
+### Example
+
+```japl
+unwrap_or_result(Ok(42), 0)
+-- 42
+
+unwrap_or_result(Err("failed"), 0)
+-- 0
+```
+
+---
+
+## is_ok
+
+```japl
+fn is_ok(r: Result) -> Bool
+```
+
+Returns `True` if the result is `Ok`, `False` if it is `Err`.
+
+### Example
+
+```japl
+is_ok(Ok(1))
+-- True
+
+is_ok(Err("error"))
+-- False
+```
+
+---
+
+## is_err
+
+```japl
+fn is_err(r: Result) -> Bool
+```
+
+Returns `True` if the result is `Err`, `False` if it is `Ok`.
+
+### Example
+
+```japl
+is_err(Err("error"))
+-- True
+
+is_err(Ok(1))
+-- False
+```
+
+---
+
+## Pattern Matching
+
+`Result` values are commonly used with pattern matching:
+
+```japl
+match parse_config(text) {
+  Ok(config) => start_server(config)
+  Err(msg) => println("Config error: " <> msg)
+}
+```
+
+---
+
+## Error Propagation
+
+In functions that return `Result`, the `?` operator provides concise error propagation:
+
+```japl
+fn process(input: String) -> Result with Io {
+  let parsed = parse(input)?
+  let validated = validate(parsed)?
+  Ok(transform(validated))
+}
+```
+
+The `?` operator desugars to a match that returns early with `Err` on failure.

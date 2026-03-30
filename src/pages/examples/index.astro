@@ -1,0 +1,161 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+
+const examples = [
+  {
+    title: "Fibonacci",
+    description: "Recursive functions with pattern matching and conditional expressions.",
+    href: "/examples/fibonacci",
+    tag: "Recursion",
+  },
+  {
+    title: "State Machine",
+    description: "Algebraic types modeling a traffic light with exhaustive pattern matching.",
+    href: "/examples/state-machine",
+    tag: "ADTs",
+  },
+  {
+    title: "Concurrent Counter",
+    description: "Lightweight processes with typed message passing and receive blocks.",
+    href: "/examples/concurrent-counter",
+    tag: "Concurrency",
+  },
+  {
+    title: "Calculator",
+    description: "Recursive algebraic data types for expression trees with evaluation.",
+    href: "/examples/calculator",
+    tag: "ADTs",
+  },
+  {
+    title: "Error Handling",
+    description: "Result types for safe error handling without exceptions.",
+    href: "/examples/error-handling",
+    tag: "Types",
+  },
+  {
+    title: "Pipes & Composition",
+    description: "Pipe-forward operator and higher-order functions for data transformation.",
+    href: "/examples/pipes-and-composition",
+    tag: "FP",
+  },
+];
+---
+<BaseLayout title="Examples" description="Learn JAPL through annotated code examples covering recursion, ADTs, concurrency, error handling, and functional composition.">
+  <Nav />
+
+  <section class="examples-hero">
+    <div class="container">
+      <h1 class="page-title">Examples</h1>
+      <p class="page-desc">Learn JAPL through annotated, real code. Each example comes from the compiler test suite and is verified to compile and run.</p>
+    </div>
+  </section>
+
+  <section class="examples-grid-section">
+    <div class="container">
+      <div class="examples-grid">
+        {examples.map((ex) => (
+          <a href={ex.href} class="example-card">
+            <span class="example-tag">{ex.tag}</span>
+            <h3>{ex.title}</h3>
+            <p>{ex.description}</p>
+            <span class="example-link">View example &rarr;</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  .examples-hero {
+    padding: 80px 0 48px;
+    text-align: center;
+  }
+
+  .page-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+  }
+
+  .page-desc {
+    color: var(--text-dim);
+    max-width: 600px;
+    margin: 0 auto;
+    font-size: 1.05rem;
+  }
+
+  .examples-grid-section {
+    padding: 0 0 100px;
+  }
+
+  .examples-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+  }
+
+  .example-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    transition: border-color 0.2s;
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+  }
+
+  .example-card:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .example-tag {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  .example-card h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+
+  .example-card p {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-bottom: 16px;
+    flex: 1;
+  }
+
+  .example-link {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  @media (max-width: 640px) {
+    .examples-hero {
+      padding: 48px 0 32px;
+    }
+
+    .page-title {
+      font-size: 1.75rem;
+    }
+
+    .examples-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

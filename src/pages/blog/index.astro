@@ -1,0 +1,116 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+---
+<BaseLayout title="Blog" description="News and updates from the JAPL programming language project.">
+  <Nav />
+
+  <section class="blog-hero">
+    <div class="container">
+      <h1 class="page-title">Blog</h1>
+      <p class="page-desc">News, updates, and insights from the JAPL project.</p>
+    </div>
+  </section>
+
+  <section class="blog-posts">
+    <div class="container">
+      <a href="/blog" class="post-card">
+        <time class="post-date">2026-03-30</time>
+        <h2 class="post-title">Announcing japl-lang.dev</h2>
+        <p class="post-excerpt">The official documentation site for JAPL is now live. Explore the language tour, reference documentation, annotated examples, and design papers -- all in one place.</p>
+        <span class="post-link">Read more &rarr;</span>
+      </a>
+    </div>
+  </section>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  .blog-hero {
+    padding: 80px 0 48px;
+    text-align: center;
+  }
+
+  .page-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+  }
+
+  .page-desc {
+    color: var(--text-dim);
+    max-width: 600px;
+    margin: 0 auto;
+    font-size: 1.05rem;
+  }
+
+  .blog-posts {
+    padding: 0 0 100px;
+  }
+
+  .blog-posts .container {
+    max-width: 720px;
+  }
+
+  .post-card {
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    transition: border-color 0.2s;
+    text-decoration: none;
+  }
+
+  .post-card:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .post-date {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 12px;
+  }
+
+  .post-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--text);
+    margin-top: 0;
+  }
+
+  .post-excerpt {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+
+  .post-link {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  @media (max-width: 640px) {
+    .blog-hero {
+      padding: 48px 0 32px;
+    }
+
+    .page-title {
+      font-size: 1.75rem;
+    }
+
+    .post-card {
+      padding: 24px;
+    }
+  }
+</style>

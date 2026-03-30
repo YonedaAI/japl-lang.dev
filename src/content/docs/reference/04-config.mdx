@@ -1,0 +1,205 @@
+---
+title: "Configuration"
+description: "Reference for the japl.toml project manifest format and configuration options."
+status: "planned"
+order: 4
+section: "reference"
+prev: { title: "CLI Reference", slug: "reference/03-cli" }
+next: { title: "Wire Protocol", slug: "reference/05-wire" }
+---
+
+# Configuration
+
+JAPL projects use a `japl.toml` manifest file at the project root. This file declares project metadata, dependencies, and build settings.
+
+> **Status: Planned.** The configuration system is currently minimal. The fields documented here represent the planned manifest format. The compiler does not yet read `japl.toml` -- it operates on individual source files passed via the CLI.
+
+---
+
+## File Location
+
+The `japl.toml` file must be placed at the root of your project directory:
+
+```text
+my-project/
+  japl.toml
+  src/
+    main.japl
+    lib.japl
+  test/
+    main_test.japl
+```
+
+---
+
+## `[package]` Section
+
+The `[package]` section declares project metadata.
+
+```toml
+[package]
+name = "my-project"
+version = "0.1.0"
+entry = "src/main.japl"
+```
+
+### Fields
+
+#### `name`
+
+**Type:** String (required)
+
+The project name. Must be a valid JAPL identifier using lowercase letters, digits, and hyphens. Used as the default module name and package identifier.
+
+```toml
+name = "http-server"
+```
+
+#### `version`
+
+**Type:** String (required)
+
+The project version following semantic versioning (major.minor.patch).
+
+```toml
+version = "1.2.3"
+```
+
+#### `entry`
+
+**Type:** String (required)
+
+The path to the main source file, relative to the project root. This is the entry point the compiler uses when building or running the project.
+
+```toml
+entry = "src/main.japl"
+```
+
+---
+
+## `[dependencies]` Section
+
+> **Planned.** Dependency management is not yet implemented.
+
+The `[dependencies]` section will declare external package dependencies.
+
+```toml
+[dependencies]
+json = "1.0"
+http = "0.5"
+```
+
+---
+
+## `[dev-dependencies]` Section
+
+> **Planned.** Dev dependencies will be available only during testing and benchmarking.
+
+```toml
+[dev-dependencies]
+test-helpers = "0.2"
+```
+
+---
+
+## `[build]` Section
+
+> **Planned.** Build configuration options for controlling compiler behavior.
+
+```toml
+[build]
+target = "native"        # "native", "wasm", "wasm-wasi"
+opt-level = 2            # 0 = debug, 1 = basic, 2 = full
+```
+
+### Fields
+
+#### `target`
+
+**Type:** String (optional, default: `"native"`)
+
+The compilation target. Supported values:
+
+| Target | Description |
+|--------|-------------|
+| `"native"` | Compile to native machine code |
+| `"wasm"` | Compile to WebAssembly |
+| `"wasm-wasi"` | Compile to WebAssembly with WASI support |
+
+#### `opt-level`
+
+**Type:** Integer (optional, default: `0`)
+
+Optimization level. Higher values produce faster code but slower compilation.
+
+---
+
+## `[test]` Section
+
+> **Planned.** Configuration for the built-in test runner.
+
+```toml
+[test]
+parallel = true
+timeout = 30000          # milliseconds per test
+```
+
+---
+
+## `[node]` Section
+
+> **Planned.** Configuration for distributed JAPL nodes.
+
+```toml
+[node]
+name = "web-1"
+listen = "0.0.0.0:9000"
+cookie-env = "CLUSTER_COOKIE"
+```
+
+---
+
+## Example `japl.toml`
+
+A complete example showing all planned sections:
+
+```toml
+[package]
+name = "my-web-service"
+version = "0.1.0"
+entry = "src/main.japl"
+
+[dependencies]
+http = "1.0"
+json = "1.2"
+db = "0.8"
+
+[dev-dependencies]
+test-helpers = "0.2"
+
+[build]
+target = "native"
+opt-level = 2
+
+[test]
+parallel = true
+timeout = 30000
+
+[node]
+name = "web-1"
+listen = "0.0.0.0:9000"
+cookie-env = "CLUSTER_COOKIE"
+```
+
+---
+
+## Current Limitations
+
+The `japl.toml` configuration system is not yet implemented in the compiler. Currently:
+
+- The compiler operates on individual `.japl` files passed as CLI arguments.
+- There is no dependency resolution or package management.
+- Build targets are controlled via the WASM codegen pipeline, not through configuration.
+- Module resolution uses file system conventions rather than manifest declarations.
+
+These features are planned for future releases. The manifest format documented here is subject to change.

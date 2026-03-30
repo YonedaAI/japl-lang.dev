@@ -1,0 +1,218 @@
+---
+title: "Distribution"
+description: "Deep dive into JAPL's location-transparent PIDs, remote spawn, node addressing, serialization, and service discovery."
+status: "preview"
+order: 6
+section: "guide"
+prev: { title: "Supervision Trees", slug: "guide/05-supervision" }
+next: { title: "Error Handling", slug: "guide/07-errors" }
+---
+
+# Distribution
+
+Most languages treat distribution as an afterthought -- a library concern layered on top of local concurrency primitives. JAPL treats distribution as a native language concern. Process identifiers are location-transparent. A PID may refer to a process on the local node or a remote node. The runtime handles serialization, discovery, and network transport. Types drive serialization: if a message type is serializable, it can cross node boundaries.
+
+This does not mean that distribution is invisible. Network boundaries introduce latency, partial failure, and serialization costs that do not exist locally. JAPL makes these boundaries visible through the effect system (the `Net` effect) while keeping the programming model uniform. You use the same `Process.send` and `Process.receive` whether the target is local or remote.
+
+## Node Addressing
+
+A node is a running instance of the JAPL runtime. Nodes are identified by name and communicate over TCP. Each node authenticates connections using a shared cookie.
+
+```japl
+let node = Node.start(
+  name = "web-1",
+  cookie = Env.get("CLUSTER_COOKIE"),
+  listen = "0.0.0.0:9000",
+)
+```
+
+Nodes connect to each other via TCP:
+
+```japl
+let remote = Node.connect("worker-1.internal:9000")
+```
+
+The connection is authenticated using the cookie. If the cookies do not match, the connection is rejected. This provides a basic level of security for cluster communication.
+
+## Location-Transparent PIDs
+
+Process identifiers (`Pid[Msg]`) are location-transparent. The core insight is that `Process.send` and `Process.receive` work identically regardless of whether the target process is on the local node or a remote node.
+
+```japl
+-- Same syntax, regardless of process location
+Process.send(pid, message)
+```
+
+Under the hood, the runtime checks whether the PID refers to a local or remote process and routes the message accordingly. For local processes, the message is placed directly in the mailbox. For remote processes, the message is serialized and sent over the network.
+
+The `Net` effect marks functions that perform network operations, making distribution boundaries visible in types when you need to be aware of them.
+
+## Remote Process Spawning
+
+You can spawn a process on a remote node using `Process.spawn_on`:
+
+```japl
+let pid = Process.spawn_on(remote_node, fn -> image_processor())
+```
+
+The function body is serialized and sent to the remote node for execution. The returned PID is usable from the local node -- you can send messages to it, monitor it, and link to it just like a local process.
+
+There is an important constraint: the function passed to `spawn_on` must not close over non-serializable values (function closures, local resources). The compiler enforces this -- all captured values must satisfy the `Serialize` constraint. This is a deliberate design choice: rather than failing at runtime when serialization is impossible, JAPL catches it at compile time.
+
+## Type-Derived Serialization
+
+JAPL derives serialization from algebraic data type definitions. Types that derive `Serialize` automatically generate efficient wire format encoders and decoders.
+
+```japl
+type JobRequest deriving(Serialize, Deserialize) = {
+  id: JobId,
+  payload: Bytes,
+  priority: Priority,
+}
+```
+
+The serialization rules are inductively defined:
+
+1. All primitive types (`Int`, `Float`, `Bool`, `String`, `Bytes`, `Unit`) are serializable.
+2. Products and sums of serializable types are serializable.
+3. Container types (`List[a]`, `Map[k, v]`, `Option[a]`) preserve serializability if their element types are serializable.
+4. `Pid[a]` is always serializable (PIDs are network addresses).
+5. **Function types are NOT serializable.** Closures cannot cross node boundaries.
+6. Named types with `deriving(Serialize)` are serializable if all field types are serializable.
+
+The round-trip guarantee is formal: if `Serialize(T)` holds and `v : T`, then `deserialize(serialize(v)) = v`. Serialization is lossless for all serializable types.
+
+> **Comparison with Other Languages**
+>
+> **Erlang:** Distribution is built in and transparent. Any Erlang term can be sent to a remote node. JAPL follows this model but adds type-derived serialization that catches serialization errors at compile time rather than runtime.
+>
+> **Go:** Distribution requires manual serialization (typically via protobuf or gRPC). There is no built-in concept of remote processes. JAPL automates this entirely through the type system.
+>
+> **Akka (Scala):** Akka provides location-transparent actors with configurable serializers. JAPL's approach is simpler: serialization is derived from types, not configured separately.
+
+## Protocol Versioning
+
+When deploying updates to a distributed system, message types may change between versions. JAPL provides type compatibility rules for rolling upgrades:
+
+**Compatible changes (no coordination required):**
+- Adding a new variant to a sum type (existing variants unchanged)
+- Adding an optional field to a record (with a default value)
+
+**Incompatible changes (require coordination):**
+- Removing a variant
+- Changing a field's type
+- Reordering constructors (binary format depends on tag order)
+
+The compiler can check compatibility between two versions of a type definition and report whether a rolling upgrade is safe. This prevents protocol mismatches that would otherwise manifest as runtime deserialization failures.
+
+## Service Discovery
+
+The runtime provides primitives for service registration and lookup:
+
+```japl
+let registry = Registry.connect("service-registry.local")
+let workers = Registry.lookup(registry, "image-processor")
+```
+
+Processes can register themselves under a name, and other processes (on any node) can look them up. This enables loose coupling between services: a client does not need to know the exact node where a service runs, only its registered name.
+
+```japl
+-- Register a service
+Registry.register(registry, "my-service", Process.self())
+
+-- Look up and use a service
+let service_pid = Registry.lookup(registry, "my-service")
+Process.send(service_pid, MyRequest(data))
+```
+
+## Process Monitoring Across Nodes
+
+Monitoring works across node boundaries. If the monitored process exits (for any reason), the monitoring process receives a `ProcessDown` message:
+
+```japl
+Process.monitor(remote_pid)
+
+match Process.receive() with
+| ProcessDown(ref, pid, reason) -> handle_failure(reason)
+```
+
+If the network connection to the remote node is lost, the monitor triggers with a `NodeDown` reason. This lets you distinguish between a process crash and a network partition.
+
+## Wire Protocol
+
+The wire protocol is binary with length-prefixed frames. It includes:
+
+- **Handshake:** Cookie authentication when nodes connect
+- **Process spawn:** Requests and responses for remote process creation
+- **Message delivery:** Serialized JAPL values with target PID
+- **Link/monitor notifications:** Propagation of failure signals across nodes
+- **Node heartbeats:** Detecting network failures and node crashes
+
+The protocol is designed for efficiency: small messages are sent inline, large messages use streaming, and the serialization format is compact and fast to encode/decode.
+
+## Common Patterns
+
+### Distributed Worker Pool
+
+Spread work across multiple nodes:
+
+```japl
+fn start_distributed_pool(nodes: List[Node]) -> List[Pid[WorkerMsg]] with Process =
+  List.flat_map(nodes, fn node ->
+    List.map(List.range(1, workers_per_node), fn _ ->
+      Process.spawn_on(node, fn -> worker(initial_state))
+    )
+  )
+```
+
+### Remote Supervision
+
+Supervisors can monitor processes on remote nodes:
+
+```japl
+fn start_remote_services(remote: Node) -> Unit with Process =
+  let pid = Process.spawn_on(remote, fn -> service_loop())
+  Process.monitor(pid)
+  -- Will receive ProcessDown if the remote process crashes
+  -- or NodeDown if the network connection is lost
+```
+
+### Location-Transparent Routing
+
+Route messages to the nearest available instance:
+
+```japl
+fn route_request(registry: Registry, req: Request) -> Unit with Process, Net =
+  let workers = Registry.lookup(registry, "request-handler")
+  let selected = select_least_loaded(workers)
+  Process.send(selected, HandleRequest(req))
+```
+
+### Cluster-Wide State
+
+Use a process on a designated node to hold shared state:
+
+```japl
+fn config_server(config: AppConfig) -> Never with Process[ConfigMsg] =
+  match Process.receive() with
+  | GetConfig(key, reply) ->
+      Reply.send(reply, Map.lookup(config, key))
+      config_server(config)
+  | UpdateConfig(key, value) ->
+      let new_config = Map.insert(config, key, value)
+      config_server(new_config)
+```
+
+## Best Practices
+
+**Design for partial failure.** In a distributed system, any remote call can fail due to network issues. Use monitors and timeouts to detect failures and handle them gracefully.
+
+**Keep message types serializable.** Avoid putting function closures or non-serializable resources in message types that might cross node boundaries. The compiler will catch this, but it is better to design for it from the start.
+
+**Use service discovery over hardcoded addresses.** Services should register themselves and look up dependencies by name, not by IP address. This makes deployments flexible and enables dynamic scaling.
+
+**Plan for protocol evolution.** Use compatible changes (adding variants, adding optional fields) when possible. When incompatible changes are necessary, coordinate deployment carefully.
+
+**Monitor network health.** Use heartbeats and `NodeDown` signals to detect network partitions early. Design your system to degrade gracefully when nodes become unreachable.
+
+**Prefer location-transparent patterns.** Write code that works the same whether the target process is local or remote. This makes testing easier (test locally, deploy distributed) and keeps the code simpler.

@@ -1,0 +1,194 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+---
+<BaseLayout title="Fibonacci" description="A recursive Fibonacci implementation demonstrating JAPL's expression-oriented syntax and type inference.">
+  <Nav />
+
+  <article class="example-page">
+    <div class="container">
+      <a href="/examples" class="back-link">&larr; All Examples</a>
+      <span class="example-tag">Recursion</span>
+      <h1>Fibonacci</h1>
+      <p class="example-intro">A classic recursive Fibonacci function showing JAPL's expression-oriented design, where <code>if/else</code> blocks return values directly.</p>
+
+      <h2>Source Code</h2>
+      <pre class="code-block"><code>fn fib(n: Int) -> Int {'{'}
+  if n &lt;= 1 {'{'} n {'}'}
+  else {'{'} fib(n - 1) + fib(n - 2) {'}'}
+{'}'}
+
+fn main() {'{'}
+  println(show(fib(0)))
+  println(show(fib(1)))
+  println(show(fib(5)))
+  println(show(fib(10)))
+{'}'}</code></pre>
+
+      <h2>What This Demonstrates</h2>
+      <ul>
+        <li><strong>Expression-oriented if/else</strong> -- The <code>if/else</code> block returns a value directly, no <code>return</code> keyword needed.</li>
+        <li><strong>Type annotations</strong> -- Function signatures declare parameter and return types with <code>name: Type</code> syntax.</li>
+        <li><strong>Recursive functions</strong> -- Functions can call themselves naturally; the compiler verifies the types at every call site.</li>
+        <li><strong>Built-in <code>show</code></strong> -- Converts integers to strings for printing.</li>
+      </ul>
+
+      <h2>Line-by-Line Breakdown</h2>
+      <dl class="breakdown">
+        <dt><code>fn fib(n: Int) -> Int</code></dt>
+        <dd>Declares a function named <code>fib</code> that takes an <code>Int</code> and returns an <code>Int</code>. The return type is explicit.</dd>
+
+        <dt><code>if n &lt;= 1 {'{'} n {'}'}</code></dt>
+        <dd>Base case: when <code>n</code> is 0 or 1, the function returns <code>n</code> itself. The block <code>{'{'} n {'}'}</code> is an expression that evaluates to <code>n</code>.</dd>
+
+        <dt><code>else {'{'} fib(n - 1) + fib(n - 2) {'}'}</code></dt>
+        <dd>Recursive case: computes the sum of the two preceding Fibonacci numbers. Both branches must return the same type (<code>Int</code>).</dd>
+
+        <dt><code>println(show(fib(10)))</code></dt>
+        <dd>Calls <code>fib(10)</code>, converts the result to a string with <code>show</code>, and prints it. Result: <code>55</code>.</dd>
+      </dl>
+
+      <h2>Try Modifying</h2>
+      <ul class="try-list">
+        <li>Add memoization by passing an accumulator: write <code>fib_acc(n, a, b)</code> with tail recursion.</li>
+        <li>Change the base case to return a different starting sequence (e.g., Lucas numbers: 2, 1, 3, 4, 7...).</li>
+        <li>Add a <code>fib_list</code> function that builds a list of the first N Fibonacci numbers.</li>
+      </ul>
+    </div>
+  </article>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  .example-page {
+    padding: 48px 0 80px;
+  }
+
+  .example-page .container {
+    max-width: 780px;
+  }
+
+  .back-link {
+    display: inline-block;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-bottom: 24px;
+    transition: color 0.2s;
+  }
+
+  .back-link:hover {
+    color: var(--accent);
+  }
+
+  .example-tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .example-page h1 {
+    font-size: 2.25rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+  }
+
+  .example-intro {
+    color: var(--text-dim);
+    font-size: 1.05rem;
+    line-height: 1.7;
+    margin-bottom: 40px;
+  }
+
+  .example-page h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin-top: 48px;
+    margin-bottom: 16px;
+  }
+
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    overflow-x: auto;
+    font-size: 0.875rem;
+    line-height: 1.75;
+    color: var(--text-dim);
+  }
+
+  .example-page ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .example-page ul li {
+    position: relative;
+    padding-left: 20px;
+    margin-bottom: 12px;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  .example-page ul li::before {
+    content: '\2022';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .breakdown {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+  }
+
+  .breakdown dt {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--accent);
+    margin-top: 16px;
+  }
+
+  .breakdown dt:first-child {
+    margin-top: 0;
+  }
+
+  .breakdown dd {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-left: 0;
+    margin-top: 4px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .breakdown dd:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .try-list li {
+    color: var(--text-dim);
+  }
+
+  @media (max-width: 640px) {
+    .example-page {
+      padding: 32px 0 48px;
+    }
+
+    .example-page h1 {
+      font-size: 1.75rem;
+    }
+  }
+</style>

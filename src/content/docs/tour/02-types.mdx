@@ -1,0 +1,172 @@
+---
+title: "Types"
+description: "Learn about JAPL's algebraic data types, record types, and built-in Option and Result types."
+status: "stable"
+order: 2
+section: "tour"
+prev: { title: "Values & Bindings", slug: "docs/tour/01-values" }
+next: { title: "Functions", slug: "docs/tour/03-functions" }
+---
+
+# Types
+
+JAPL has a powerful type system rooted in the ML tradition. You define your own types using **sum types** (tagged unions) and **record types** (named fields), then the compiler ensures every value is used correctly. Types are your primary tool for modeling the shape of data in your program.
+
+## Sum Types
+
+A sum type defines a value that can be one of several variants. Each variant can carry data. This is sometimes called an algebraic data type or tagged union.
+
+```japl
+type Light =
+  | Red
+  | Yellow
+  | Green
+```
+
+Variants can hold values of different types:
+
+```japl
+type Shape =
+  | Circle(Float)
+  | Rectangle(Float, Float)
+  | Triangle(Float, Float, Float)
+```
+
+You construct values by using the variant name as a function:
+
+```japl
+let stop = Red
+let unit_circle = Circle(1.0)
+let box = Rectangle(4.0, 3.0)
+```
+
+Sum types shine when combined with pattern matching. Every variant must be handled, so the compiler catches missing cases at compile time:
+
+```japl
+fn light_name(light: Light) -> String {
+  match light {
+    Red => "RED"
+    Yellow => "YELLOW"
+    Green => "GREEN"
+  }
+}
+```
+
+## Recursive Types
+
+Types can refer to themselves, which is essential for modeling tree-shaped data:
+
+```japl
+type Tree =
+  | Leaf(Int)
+  | Branch(Tree, Tree)
+
+fn sum_tree(t: Tree) -> Int {
+  match t {
+    Leaf(n) => n
+    Branch(left, right) => sum_tree(left) + sum_tree(right)
+  }
+}
+```
+
+You can build arbitrarily nested structures:
+
+```japl
+let tree = Branch(Branch(Leaf(1), Leaf(2)), Branch(Leaf(3), Leaf(4)))
+-- sum_tree(tree) returns 10
+```
+
+## Record Types
+
+Records group named fields together. Access fields with dot notation, and create updated copies with the `|` syntax:
+
+```japl
+type Point = { x: Float, y: Float }
+
+let origin = { x: 0.0, y: 0.0 }
+let p = { x: 3.0, y: 4.0 }
+
+let moved = { p | x: 5.0 }
+-- moved is { x: 5.0, y: 4.0 }
+```
+
+## The Option Type
+
+`Option` represents a value that might be absent. It replaces null references with a type-safe alternative:
+
+```japl
+type Option =
+  | Some(Int)
+  | None
+```
+
+Use helper functions to work with optional values without unwrapping everywhere:
+
+```japl
+fn map_option(opt: Option, f: fn(Int) -> Int) -> Option {
+  match opt {
+    Some(x) => Some(f(x))
+    None => None
+  }
+}
+
+fn unwrap_or(opt: Option, fallback: Int) -> Int {
+  match opt {
+    Some(x) => x
+    None => fallback
+  }
+}
+```
+
+## The Result Type
+
+`Result` represents an operation that can succeed or fail. Errors are values, not exceptions:
+
+```japl
+type Result =
+  | Ok(Int)
+  | Err(String)
+```
+
+You can transform successful values while leaving errors untouched:
+
+```japl
+fn map_result(r: Result, f: fn(Int) -> Int) -> Result {
+  match r {
+    Ok(x) => Ok(f(x))
+    Err(e) => Err(e)
+  }
+}
+```
+
+## Combining Types
+
+Real programs combine sum types, records, and recursion to model complex domains. Here is a state machine modeled entirely with types:
+
+```japl
+type Light =
+  | Red
+  | Yellow
+  | Green
+
+type Action =
+  | Next
+  | Emergency
+
+fn transition(light: Light, action: Action) -> Light {
+  match action {
+    Emergency => Red
+    Next => match light {
+      Red => Green
+      Green => Yellow
+      Yellow => Red
+    }
+  }
+}
+```
+
+Every state and every transition is visible in the types. Invalid states are unrepresentable.
+
+## Next Steps
+
+Now that you can define your own types, learn how to write functions that operate on them in [Functions](/docs/tour/03-functions).

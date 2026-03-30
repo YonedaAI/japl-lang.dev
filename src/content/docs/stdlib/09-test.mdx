@@ -1,0 +1,158 @@
+---
+title: "Test"
+description: "Reference for the Test standard library module providing assertion functions for the built-in test framework."
+status: "stable"
+order: 9
+section: "stdlib"
+prev: { title: "Process", slug: "stdlib/08-process" }
+---
+
+# Test
+
+The `Test` module provides assertion functions for use within JAPL's built-in test framework. Tests are first-class language constructs declared with the `test` keyword.
+
+```japl
+import Test
+```
+
+---
+
+## assert_eq
+
+```japl
+fn assert_eq(actual: a, expected: a) -> Unit
+```
+
+Asserts that two values are structurally equal. If they are not equal, the test fails with a diagnostic showing both values.
+
+### Example
+
+```japl
+test "addition" {
+  Test.assert_eq(1 + 1, 2)
+}
+
+test "string concatenation" {
+  Test.assert_eq("hello" <> " world", "hello world")
+}
+```
+
+---
+
+## assert_ne
+
+```japl
+fn assert_ne(actual: a, expected: a) -> Unit
+```
+
+Asserts that two values are not structurally equal. If they are equal, the test fails.
+
+### Example
+
+```japl
+test "different values" {
+  Test.assert_ne(1, 2)
+}
+
+test "different strings" {
+  Test.assert_ne("hello", "world")
+}
+```
+
+---
+
+## assert_true
+
+```japl
+fn assert_true(v: Bool) -> Unit
+```
+
+Asserts that the given boolean value is `True`. If it is `False`, the test fails.
+
+### Example
+
+```japl
+test "positive check" {
+  Test.assert_true(5 > 3)
+}
+
+test "list contains element" {
+  let has_it = List.any([1, 2, 3], fn(x) { x == 2 })
+  Test.assert_true(has_it)
+}
+```
+
+---
+
+## assert_false
+
+```japl
+fn assert_false(v: Bool) -> Unit
+```
+
+Asserts that the given boolean value is `False`. If it is `True`, the test fails.
+
+### Example
+
+```japl
+test "negative check" {
+  Test.assert_false(3 > 5)
+}
+
+test "empty list has no elements" {
+  let has_it = List.any([], fn(x) { x == 1 })
+  Test.assert_false(has_it)
+}
+```
+
+---
+
+## Writing Tests
+
+Tests are top-level declarations using the `test` keyword:
+
+```japl
+test "parsing a valid integer" {
+  Test.assert_eq(parse_int("42"), Ok(42))
+}
+
+test "parsing rejects non-numeric input" {
+  Test.assert_true(is_err(parse_int("abc")))
+}
+```
+
+The compiler discovers all test blocks automatically. Run tests with:
+
+```bash
+japlc run my_test.japl
+```
+
+---
+
+## Property-Based Testing
+
+JAPL also supports property-based testing with the `property` keyword and `forall` quantifier:
+
+```japl
+property "reversing a list twice is identity" {
+  forall (xs: List(Int)) ->
+    List.reverse(List.reverse(xs)) == xs
+}
+```
+
+The test runner generates random values for the universally quantified variables and checks the property. If a counterexample is found, it is shrunk to a minimal failing case.
+
+---
+
+## Benchmark Blocks
+
+Performance benchmarks use the `bench` keyword:
+
+```japl
+bench "list map over 1000 elements" {
+  let big_list = List.range(1, 1000)
+  List.map(big_list, fn(x) { x * 2 })
+}
+```
+
+The runtime measures execution time and reports statistics.

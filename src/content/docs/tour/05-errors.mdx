@@ -1,0 +1,161 @@
+---
+title: "Error Handling"
+description: "Learn how JAPL handles errors with Result and Option types, the ? operator, and crash/restart semantics."
+status: "stable"
+order: 5
+section: "tour"
+prev: { title: "Pattern Matching", slug: "docs/tour/04-pattern-matching" }
+next: { title: "Pipes & Composition", slug: "docs/tour/06-pipes" }
+---
+
+# Error Handling
+
+JAPL treats errors as values, not exceptions. Every operation that can fail returns a `Result` or `Option` type, and the compiler ensures you handle the failure case. There are no hidden control flow surprises -- you always see where errors can occur by reading the types.
+
+## Result: Success or Failure
+
+The `Result` type represents an operation that either succeeds with a value or fails with an error:
+
+```japl
+type Result =
+  | Ok(Int)
+  | Err(String)
+```
+
+Functions that can fail return `Result`:
+
+```japl
+fn divide(a: Int, b: Int) -> Result {
+  if b == 0 { Err("division by zero") }
+  else { Ok(a / b) }
+}
+```
+
+## Handling Results with Pattern Matching
+
+The most explicit way to handle errors is pattern matching:
+
+```japl
+fn main() {
+  match divide(10, 2) {
+    Ok(n) => println("10/2 = " <> show(n))
+    Err(e) => println("Error: " <> e)
+  }
+  match divide(10, 0) {
+    Ok(n) => println("10/0 = " <> show(n))
+    Err(e) => println("Error: " <> e)
+  }
+}
+```
+
+This prints:
+
+```
+10/2 = 5
+Error: division by zero
+```
+
+## Transforming Results
+
+Use `map_result` to transform the success value without unwrapping:
+
+```japl
+fn map_result(r: Result, f: fn(Int) -> Int) -> Result {
+  match r {
+    Ok(x) => Ok(f(x))
+    Err(e) => Err(e)
+  }
+}
+
+let doubled = map_result(divide(10, 2), fn(x: Int) { x * 2 })
+-- doubled is Ok(10)
+```
+
+If the result is an error, the transformation is skipped and the error passes through unchanged.
+
+## Providing Defaults
+
+When you need a concrete value regardless of success or failure, use `unwrap_or`:
+
+```japl
+fn unwrap_or_result(r: Result, fallback: Int) -> Int {
+  match r {
+    Ok(x) => x
+    Err(_) => fallback
+  }
+}
+
+let safe = unwrap_or_result(divide(10, 0), 0)
+-- safe is 0
+```
+
+## The ? Operator
+
+For functions that call multiple fallible operations, the `?` operator propagates errors automatically. It unwraps an `Ok` value or returns the `Err` early:
+
+```japl
+fn get_user(id: UserId) -> Result[User, AppError] with Io =
+  let row = Db.query_one(sql, [id])?
+  validate_user(row)?
+  Ok(to_user(row))
+```
+
+This is equivalent to writing nested match expressions, but far more readable. Each `?` either extracts the success value or returns the error to the caller immediately.
+
+## Option: Present or Absent
+
+`Option` handles the case where a value might not exist -- a safer alternative to null:
+
+```japl
+type Option =
+  | Some(Int)
+  | None
+
+fn map_option(opt: Option, f: fn(Int) -> Int) -> Option {
+  match opt {
+    Some(x) => Some(f(x))
+    None => None
+  }
+}
+
+fn unwrap_or(opt: Option, fallback: Int) -> Int {
+  match opt {
+    Some(x) => x
+    None => fallback
+  }
+}
+```
+
+## Checking Presence
+
+Query helpers let you branch on whether a value is present without destructuring:
+
+```japl
+fn is_some(opt: Option) -> Bool {
+  match opt {
+    Some(_) => True
+    None => False
+  }
+}
+
+fn is_ok(r: Result) -> Bool {
+  match r {
+    Ok(_) => True
+    Err(_) => False
+  }
+}
+```
+
+## Two Error Strategies
+
+JAPL provides two complementary approaches to failure:
+
+1. **Result types** for expected, recoverable errors -- validation failures, missing files, bad input. These are values you handle in your logic.
+
+2. **Crash/restart semantics** for unexpected failures -- hardware faults, corrupted state, bugs. Processes crash and their supervisors restart them. You will learn about this in the [Supervision](/docs/tour/09-supervision) chapter.
+
+The guiding principle: use `Result` for errors your code anticipates, and let supervisors handle everything else.
+
+## Next Steps
+
+Now that you can handle errors as values, learn how to build elegant data pipelines in [Pipes & Composition](/docs/tour/06-pipes).

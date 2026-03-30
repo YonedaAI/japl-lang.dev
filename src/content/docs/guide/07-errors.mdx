@@ -1,0 +1,262 @@
+---
+title: "Error Handling"
+description: "Deep dive into JAPL's dual error model with Result types, the ? operator, Fail effect, and process crash semantics."
+status: "stable"
+order: 7
+section: "guide"
+prev: { title: "Distribution", slug: "guide/06-distribution" }
+next: { title: "Modules & Imports", slug: "guide/08-modules" }
+---
+
+# Error Handling
+
+Error handling is one of the most important aspects of software design, and one of the most commonly botched. Languages that use exceptions hide error paths in invisible control flow. Languages that use error codes tempt programmers to ignore return values. JAPL provides a dual error model that cleanly separates two fundamentally different kinds of failure: expected errors that can be handled as values, and unexpected failures that should crash the process so a supervisor can restart it.
+
+This dual model is not a compromise -- it is a deliberate design that covers all failure modes with no gaps. Expected failures like "file not found" or "invalid input" are values tracked by the type system. Unexpected failures like corrupted state or hardware faults are handled by crashing and restarting with fresh state.
+
+## The Result Type
+
+Domain errors represent expected, recoverable failures: parse errors, validation failures, not-found conditions. They are values in the type system, and you must handle them.
+
+```japl
+type Result[a, e] =
+  | Ok(a)
+  | Err(e)
+```
+
+You define your own error types as sum types, giving them as much structure as you need:
+
+```japl
+type AppError =
+  | NotFound(String)
+  | Unauthorized
+  | ValidationError(List[FieldError])
+  | DatabaseError(DbError)
+```
+
+Pattern matching forces you to handle every error case:
+
+```japl
+match parse(source) with
+| Ok(ast) -> compile(ast)
+| Err(InvalidSyntax(msg, line)) -> report_error(msg, line)
+| Err(UnexpectedEof) -> report_error("unexpected end of file", 0)
+```
+
+## The ? Operator
+
+The `?` postfix operator propagates errors through the call chain, eliminating boilerplate pattern matching:
+
+```japl
+fn get_user(id: UserId) -> Result[User, AppError] with Io =
+  let row = Db.query_one(sql, [id])?
+  validate_user(row)?
+  Ok(to_user(row))
+```
+
+The `?` operator desugars to:
+
+```japl
+match expr with
+| Ok(val) -> val
+| Err(e) -> return Err(e)
+```
+
+If the expression succeates, the unwrapped value is used. If it fails, the error is returned immediately from the enclosing function. This gives you the ergonomics of exceptions (errors propagate up the call stack) with the safety of explicit error types (you always know which functions can fail).
+
+The `?` operator is valid only in functions whose return type is `Result[_, E]` or which have the `Fail[E]` effect.
+
+## The Option Type
+
+For values that may or may not exist (without an error reason), JAPL provides `Option`:
+
+```japl
+type Option[a] =
+  | Some(a)
+  | None
+```
+
+`Option` replaces null/nil values found in other languages. The compiler forces you to handle the `None` case, making null pointer exceptions impossible:
+
+```japl
+fn find_user(id: UserId) -> Option[User] =
+  Map.lookup(users, id)
+
+match find_user(42) with
+| Some(user) -> greet(user)
+| None -> Io.println("user not found")
+```
+
+## The Fail Effect
+
+The `Fail[E]` effect is an algebraic effect for error signaling. It provides an alternative to returning `Result` directly and composes more cleanly in effect signatures:
+
+```japl
+fn read_config(path: String) -> Config with Io, Fail[ConfigError] =
+  let text = File.read_to_string(path)?
+  parse_config(text)?
+```
+
+The `Fail[E]` effect can be handled with `Fail.catch`, which converts the effectful computation into a `Result`:
+
+```japl
+let result: Result[Config, ConfigError] = Fail.catch(fn ->
+  read_config("/etc/app.conf")
+)
+```
+
+This is the bridge between effectful error handling and value-based error handling. You can use whichever style suits your needs, and convert between them at any point.
+
+## Error Type Composition
+
+When composing functions with different error types, explicit conversion is required. JAPL does not silently merge error types -- you must be explicit about how errors from different sources relate:
+
+```japl
+fn get_profile(id: UserId) -> Profile with Io, Fail[AppError] =
+  let user = get_user(id)?
+  let prefs = get_preferences(id) |> map_err(fn e -> DbError(show(e)))?
+  { user, preferences = prefs }
+```
+
+The `map_err` function converts one error type into another, making the error path explicit and documented.
+
+## Process Failures: Crash and Restart
+
+Process failures represent unexpected conditions: invariant violations, corrupted state, unrecoverable resource loss. When these happen, the right response is not to try to recover locally -- it is to crash the process and let a supervisor restart it with fresh state.
+
+```japl
+fn critical_worker(state: State) -> Never with Process[WorkerMsg] =
+  match Process.receive() with
+  | ProcessTask(task) ->
+      assert valid_invariant(state)
+      let new_state = handle_task(state, task)
+      critical_worker(new_state)
+  | Shutdown ->
+      cleanup(state)
+      Process.exit(Normal)
+```
+
+If `assert` fails or any unhandled exception occurs, the process crashes. Its supervisor detects the crash via the process monitoring mechanism and applies the configured restart strategy.
+
+### Panic
+
+`panic(message)` immediately terminates the current process with crash reason `AssertionFailed(message, location)`. It is intended for programming errors (violated invariants), not for expected failures.
+
+### Assert
+
+`assert condition` evaluates `condition`. If `False`, the current process panics with a diagnostic message showing the assertion expression and source location.
+
+```japl
+assert List.length(items) > 0
+```
+
+## The Error/Crash Boundary
+
+The two error modes are complementary and serve different purposes:
+
+| Aspect | Domain Errors | Process Failures |
+|--------|--------------|------------------|
+| **Nature** | Expected | Unexpected |
+| **Mechanism** | `Result` + `Fail` effect | `crash` + supervision |
+| **Scope** | Function / call chain | Process |
+| **Recovery** | Caller handles the error | Supervisor restarts the process |
+| **State** | Preserved | Discarded (fresh state on restart) |
+| **Typing** | Algebraic error types | Typed crash reasons |
+
+The guideline is clear: if you know what went wrong and can describe it as a type, use `Result` or `Fail`. If state may be corrupted or the failure is unexpected, let the process crash.
+
+> **Comparison with Other Languages**
+>
+> **Rust:** Uses `Result` and `panic!`. The `?` operator propagates errors. No supervision -- panics crash the thread. JAPL adds the supervision layer that makes crash recovery systematic.
+>
+> **Erlang:** Uses the "let it crash" philosophy with supervision. Error values are untyped tuples. JAPL combines Erlang's crash/restart model with Rust's typed error values.
+>
+> **Go:** Uses error values (the `error` interface) with manual checking. No `?` operator, no supervision. Errors are easy to ignore accidentally. JAPL's type system prevents ignoring errors.
+>
+> **Haskell:** Uses `Either` for errors and the `IO` monad for effects. No crash/restart model. JAPL's dual error model provides a systematic approach to both expected and unexpected failures.
+
+## Common Patterns
+
+### Railway-Oriented Programming
+
+Chain operations that might fail using the pipe operator and `?`:
+
+```japl
+fn process_order(raw: String) -> Result[Receipt, OrderError] with Io =
+  let order = parse_order(raw)?
+  let validated = validate_order(order)?
+  let priced = calculate_totals(validated)?
+  let receipt = generate_receipt(priced)?
+  Ok(receipt)
+```
+
+Each step can fail, and the error propagates automatically. The happy path reads top-to-bottom without error-handling noise.
+
+### Error Context
+
+Add context to errors as they propagate up the call stack:
+
+```japl
+fn load_user_config(user_id: UserId) -> Config with Io, Fail[AppError] =
+  let path = config_path(user_id)
+  let config = read_config(path)
+    |> map_err(fn e -> ConfigLoadError(user_id, path, e))?
+  config
+```
+
+### Graceful Degradation
+
+Use `Option` and default values for non-critical failures:
+
+```japl
+fn get_user_preferences(id: UserId) -> Preferences with Io =
+  match load_preferences(id) with
+  | Ok(prefs) -> prefs
+  | Err(_) -> default_preferences()
+```
+
+### Error Accumulation
+
+Collect multiple errors instead of stopping at the first one:
+
+```japl
+fn validate_form(input: FormInput) -> Result[ValidForm, List[FieldError]] =
+  let errors = []
+  let errors = if String.is_empty(input.name) then
+    [FieldError("name", "required"), ..errors] else errors
+  let errors = if !is_valid_email(input.email) then
+    [FieldError("email", "invalid"), ..errors] else errors
+  if List.is_empty(errors) then
+    Ok({ name = input.name, email = input.email })
+  else
+    Err(errors)
+```
+
+### Process Crash Recovery
+
+Design processes to recover gracefully from crashes:
+
+```japl
+fn database_worker(conn: DbConn) -> Never with Process[DbQuery] =
+  -- If this crashes, the supervisor restarts with a fresh connection
+  let query = Process.receive()
+  let result = Db.execute(conn, query)
+  Process.send(query.reply_to, result)
+  database_worker(conn)
+```
+
+The key insight: the supervisor calls the start function again, which creates a new database connection. The old, possibly-corrupted connection is discarded.
+
+## Best Practices
+
+**Use `Result` for expected failures.** Parse errors, validation failures, not-found conditions -- these are part of your domain and should be modeled as types.
+
+**Let unexpected failures crash the process.** Do not try to recover from corrupted state or invariant violations. Let the supervisor restart with clean state.
+
+**Use `?` liberally.** The question-mark operator makes error propagation concise and readable. Reserve explicit `match` for cases where you need to transform or handle specific error variants.
+
+**Keep error types specific.** Define error types that describe what went wrong in domain terms. Avoid generic error strings when a sum type would be more precise.
+
+**Design for the error/crash boundary.** Think about which failures are expected (model them as types) and which are unexpected (let them crash). The boundary should be clear and intentional.
+
+**Add context to errors.** When propagating errors up the call stack, use `map_err` to add context about what operation was being attempted. This makes debugging much easier.

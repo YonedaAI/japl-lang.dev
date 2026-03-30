@@ -1,0 +1,241 @@
+---
+title: "Modules & Imports"
+description: "Deep dive into JAPL's module declarations, visibility rules, import syntax, signatures, and namespacing."
+status: "preview"
+order: 8
+section: "guide"
+prev: { title: "Error Handling", slug: "guide/07-errors" }
+next: { title: "Traits", slug: "guide/09-traits" }
+---
+
+# Modules & Imports
+
+As programs grow, organization becomes critical. JAPL's module system provides the structure: modules are namespaces for types and functions, signatures define interfaces, and imports control what is visible where. There are no classes, no objects, no inheritance hierarchies. Modules group related functions. Signatures define contracts. The result is a system that is simple to understand and scales to large codebases.
+
+JAPL's module system takes inspiration from ML's module system (signatures as interfaces, modules as implementations) but simplifies it significantly. There are no functors (modules parameterized by other modules) in the initial design -- functions and traits handle the cases where parameterization is needed.
+
+## Module Declarations
+
+A module is a named collection of types, functions, and sub-modules. Modules serve three purposes: namespacing, compilation units, and encapsulation boundaries.
+
+```japl
+module Http.Server
+
+import Http.{Request, Response, Status}
+import Json
+
+fn handle_request(req: Request) -> Response with Io, Net =
+  let body = Json.parse(req.body)
+  match body with
+  | Ok(data) -> Response.json(Status.Ok, data)
+  | Err(_) -> Response.text(Status.BadRequest, "invalid JSON")
+```
+
+Module names begin with an uppercase letter and use `.` as the path separator. The module name typically corresponds to the file path: `Http.Server` lives in `Http/Server.japl`.
+
+### Inline Modules
+
+Modules can also be defined inline, containing their own types and functions:
+
+```japl
+module Map =
+  opaque type Map[k, v]
+
+  fn empty() -> Map[k, v] = ...
+  fn insert(map: Map[k, v], key: k, value: v) -> Map[k, v] where Ord[k] = ...
+  fn lookup(map: Map[k, v], key: k) -> Option[v] where Ord[k] = ...
+  fn delete(map: Map[k, v], key: k) -> Map[k, v] where Ord[k] = ...
+  fn fold(map: Map[k, v], init: acc, f: fn(acc, k, v) -> acc) -> acc = ...
+```
+
+## Visibility
+
+By default, all declarations in a module are **public** -- accessible from other modules. JAPL takes the approach that visibility should be simple and binary: either something is public (part of the module's API) or hidden behind an opaque type.
+
+The primary encapsulation mechanism is the **opaque type**, which hides a type's representation:
+
+```japl
+module Map =
+  opaque type Map[k, v]
+
+  fn empty() -> Map[k, v] = ...
+  fn insert(map: Map[k, v], key: k, value: v) -> Map[k, v] where Ord[k] = ...
+```
+
+Outside the `Map` module, code cannot construct or destructure `Map[k, v]` values directly. It can only use the module's public functions. Inside the module, the full type definition is visible.
+
+This is equivalent to private fields in object-oriented languages, but simpler: there is no `private`, `protected`, `internal`, or `package-private`. A type is either transparent (callers can see the representation) or opaque (callers cannot).
+
+## Imports
+
+JAPL provides two import forms:
+
+### Module Import
+
+Import a module and access its contents via qualified names:
+
+```japl
+import Http.Server
+
+-- Use via qualified name
+Http.Server.handle_request(req)
+```
+
+### Selective Import
+
+Import specific items from a module:
+
+```japl
+import Http.{Request, Response}
+
+-- Use directly (no qualifier needed)
+let req: Request = ...
+let resp: Response = ...
+```
+
+The module path separator is `.`, which is the same as the field access operator. The compiler resolves ambiguity based on whether the left-hand side is a module or a value.
+
+## Signatures (Module Types)
+
+Signatures define the interface a module must satisfy. They are JAPL's version of interfaces, but at the module level rather than the type level:
+
+```japl
+signature KeyValueStore[k, v] =
+  type Store
+  fn create() -> Store with Io
+  fn get(store: Store, key: k) -> Option[v] with Io
+  fn set(store: Store, key: k, value: v) -> Unit with Io
+  fn delete(store: Store, key: k) -> Unit with Io
+```
+
+A signature declares abstract types and function signatures. The abstract `type Store` means that implementations can choose their own backing type for `Store`.
+
+### Implementing a Signature
+
+A module satisfies a signature if it provides all required types and functions with compatible types and effects:
+
+```japl
+module RedisStore : KeyValueStore[String, String] =
+  type Store = RedisConnection
+  fn create() -> Store with Io = Redis.connect(default_config)
+  fn get(store, key) with Io = Redis.get(store, key)
+  fn set(store, key, value) with Io = Redis.set(store, key, value)
+  fn delete(store, key) with Io = Redis.del(store, key)
+```
+
+The `: KeyValueStore[String, String]` annotation tells the compiler to check that `RedisStore` satisfies the `KeyValueStore` signature with `k = String` and `v = String`.
+
+> **Comparison with Other Languages**
+>
+> **OCaml/SML:** ML modules with signatures and functors are the gold standard for module system expressiveness. JAPL takes the simpler subset (signatures and implementations) without functors, using traits and functions for parameterization instead.
+>
+> **Rust:** Rust modules are simpler (just file-based namespaces with `pub` visibility) but lack signatures. Traits fill some of the same role but operate on types, not modules. JAPL provides both module signatures and traits.
+>
+> **Go:** Go packages with interfaces are conceptually similar to JAPL's modules with signatures. The main difference is that Go interfaces are structural (any type with matching methods satisfies them), while JAPL signatures are explicitly implemented.
+>
+> **Haskell:** Haskell modules are primarily namespaces with export lists. The module system is much simpler than ML's, compensating with type classes for abstraction. JAPL occupies a middle ground.
+
+## Module Compilation
+
+Modules are compiled independently. When a module's implementation changes but its signature (exported types and function signatures) does not change, downstream modules do not need recompilation.
+
+This property is critical for fast incremental builds. In a large codebase, changing the implementation of a leaf module should not trigger recompilation of the entire dependency tree. JAPL's module system is designed to make this the common case.
+
+## Namespacing Conventions
+
+JAPL follows a consistent naming convention:
+
+- **Module names** begin with an uppercase letter: `Http`, `Json`, `Process`
+- **Function names** begin with a lowercase letter: `parse`, `encode`, `send`
+- **Type names** begin with an uppercase letter: `Request`, `Response`, `Option`
+- **Constructors** begin with an uppercase letter: `Some`, `None`, `Ok`, `Err`
+
+The standard library follows a hierarchical namespace:
+
+```
+Std.Http      -- HTTP client and server
+Std.Json      -- JSON encoding/decoding
+Std.Crypto    -- Cryptographic primitives
+Std.Fs        -- File system operations
+Std.Net       -- TCP/UDP networking
+Std.Test      -- Testing framework
+Std.Time      -- Time and duration
+Std.Log       -- Structured logging
+Std.Trace     -- Distributed tracing
+```
+
+## Common Patterns
+
+### Module as Namespace
+
+Group related functions under a module name:
+
+```japl
+module Json =
+  fn parse(input: String) -> Result[JsonValue, ParseError] = ...
+  fn encode(value: JsonValue) -> String = ...
+  fn pretty_print(value: JsonValue, indent: Int) -> String = ...
+```
+
+### Opaque Type with Smart Constructor
+
+Use opaque types with validation in the constructor:
+
+```japl
+module Email =
+  opaque type Email
+
+  fn parse(input: String) -> Result[Email, ValidationError] =
+    if is_valid_email(input) then Ok(Email.from_raw(input))
+    else Err(InvalidEmail(input))
+
+  fn to_string(email: Email) -> String =
+    Email.to_raw(email)
+```
+
+Outside the module, the only way to create an `Email` is through `Email.parse`, which validates the input. This makes invalid emails unrepresentable.
+
+### Signature-Based Dependency Injection
+
+Use signatures to abstract over implementations:
+
+```japl
+signature Logger =
+  fn info(msg: String) -> Unit with Io
+  fn error(msg: String) -> Unit with Io
+  fn debug(msg: String) -> Unit with Io
+
+module ConsoleLogger : Logger =
+  fn info(msg) with Io = Io.println("[INFO] " ++ msg)
+  fn error(msg) with Io = Io.println("[ERROR] " ++ msg)
+  fn debug(msg) with Io = Io.println("[DEBUG] " ++ msg)
+
+module FileLogger : Logger =
+  fn info(msg) with Io = File.append(log_path, "[INFO] " ++ msg ++ "\n")
+  fn error(msg) with Io = File.append(log_path, "[ERROR] " ++ msg ++ "\n")
+  fn debug(msg) with Io = File.append(log_path, "[DEBUG] " ++ msg ++ "\n")
+```
+
+## Trait Implementations and Modules
+
+Trait implementations are scoped to modules and follow the orphan rule: an `impl` must be in the same module as either the trait or the implementing type. This prevents conflicting implementations from different modules.
+
+```japl
+-- This impl must be in the module that defines either Show or Point
+impl Show[Point] =
+  fn show(p) = "(" ++ Float.to_string(p.x) ++ ", " ++ Float.to_string(p.y) ++ ")"
+```
+
+Trait implementations are automatically imported when either the trait or the implementing type is in scope.
+
+## Best Practices
+
+**Use opaque types for abstraction.** When you want to hide implementation details, make the type opaque and expose only the operations you want callers to use.
+
+**Keep modules focused.** A module should represent a single concept or concern. If a module is growing too large, split it into sub-modules.
+
+**Use signatures for swappable implementations.** When you need multiple implementations of the same interface (different databases, different loggers, test doubles), define a signature and implement it multiple times.
+
+**Follow the standard naming conventions.** Consistent naming makes code predictable and readable across the ecosystem.
+
+**Design for incremental compilation.** Keep module interfaces stable. When changing implementation details, avoid changing the public function signatures if possible.

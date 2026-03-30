@@ -1,0 +1,52 @@
+---
+title: "Values & Bindings"
+description: "Learn about JAPL's immutable-first value system, let bindings, and primitive types."
+status: "stable"
+order: 1
+section: "tour"
+next: { title: "Types", slug: "docs/tour/02-types" }
+---
+
+# Values & Bindings
+
+JAPL is a value-oriented language. All data is immutable by default — values flow through functions without hidden state changes.
+
+## Let Bindings
+
+Use `let` to bind a value to a name:
+
+```japl
+let name = "JAPL"
+let version = 1
+let pi = 3.14159
+let active = True
+```
+
+## Primitive Types
+
+| Type | Description | Example |
+|------|------------|---------|
+| `Int` | Arbitrary precision integer | `42`, `0xFF`, `0b1010` |
+| `Float` | IEEE 754 float | `3.14`, `1.0e10` |
+| `String` | UTF-8 string | `"hello"` |
+| `Char` | Unicode character | `'a'`, `'\n'` |
+| `Bool` | Boolean | `True`, `False` |
+| `Unit` | Unit type | `()` |
+
+## Immutability
+
+Values cannot be reassigned. This eliminates an entire class of bugs:
+
+```japl
+let x = 42
+-- x = 43  -- Error! Values are immutable
+```
+
+## Expressions
+
+Everything in JAPL is an expression that returns a value:
+
+```japl
+let result = if True { "yes" } else { "no" }
+let sum = 1 + 2 + 3
+```

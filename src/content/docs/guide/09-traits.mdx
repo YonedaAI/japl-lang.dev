@@ -1,0 +1,246 @@
+---
+title: "Traits"
+description: "Deep dive into JAPL's trait definitions, impl blocks, deriving, trait bounds, and polymorphic dispatch."
+status: "preview"
+order: 9
+section: "guide"
+prev: { title: "Modules & Imports", slug: "guide/08-modules" }
+next: { title: "Records", slug: "guide/10-records" }
+---
+
+# Traits
+
+When you write a `sort` function, it needs to know how to compare elements. When you serialize a value, you need to know how to encode each type. When you print a value, you need a way to convert it to a string. These operations vary by type, but their interface is the same. JAPL uses **traits** to define these shared interfaces.
+
+Traits are JAPL's version of type classes (Haskell) or interfaces (Rust). A trait declares a set of functions that a type must implement. Unlike object-oriented interfaces, traits do not imply inheritance, method dispatch tables, or identity. They are simply a way to say "this type supports these operations."
+
+## Defining Traits
+
+A trait is declared with the `trait` keyword, a name, type parameters, and a set of function signatures:
+
+```japl
+trait Eq[a] =
+  fn eq(x: a, y: a) -> Bool
+
+trait Show[a] =
+  fn show(value: a) -> String
+
+trait Serialize[a] =
+  fn serialize(value: a) -> Bytes
+  fn deserialize(data: Bytes) -> Result[a, SerializeError]
+```
+
+The type parameter `a` represents the type that will implement the trait. Multiple function signatures can appear in a single trait.
+
+### Supertraits
+
+Traits can require other traits as prerequisites using `where`:
+
+```japl
+trait Ord[a] where Eq[a] =
+  fn compare(x: a, y: a) -> Ordering
+```
+
+This means that any type implementing `Ord` must also implement `Eq`. Supertraits form a hierarchy: `Ord` implies `Eq`, so you can use `eq` on any value that satisfies `Ord`.
+
+### Higher-Kinded Traits
+
+JAPL supports traits on type constructors, not just concrete types:
+
+```japl
+trait Functor[f] =
+  fn map[a, b](fa: f[a], func: fn(a) -> b) -> f[b]
+```
+
+Here, `f` is a type constructor (like `List`, `Option`, or `Result[_, e]`), not a concrete type. This enables abstracting over containers and other parameterized types.
+
+## Implementing Traits
+
+Implementations are provided with `impl` blocks:
+
+```japl
+impl Eq[Int] =
+  fn eq(x, y) = x == y
+
+impl Show[Shape] =
+  fn show(shape) =
+    match shape with
+    | Circle(r) -> "Circle(" ++ Float.to_string(r) ++ ")"
+    | Rectangle(w, h) -> "Rectangle(" ++ Float.to_string(w) ++ ", " ++ Float.to_string(h) ++ ")"
+    | Triangle(a, b, c) -> "Triangle(...)"
+```
+
+Within an `impl` block, the function parameters have their types inferred from the trait definition. You do not need to repeat the type annotations.
+
+### Parametric Implementations
+
+Implementations can be parametric, providing trait implementations for entire families of types:
+
+```japl
+impl Eq[List[a]] where Eq[a] =
+  fn eq(xs, ys) =
+    match (xs, ys) with
+    | ([], []) -> True
+    | ([x, ..rest_x], [y, ..rest_y]) ->
+        eq(x, y) && eq(rest_x, rest_y)
+    | _ -> False
+```
+
+This says: "For any type `a` that implements `Eq`, `List[a]` also implements `Eq`." The implementation compares lists element by element, requiring that each element type supports equality.
+
+## Deriving
+
+JAPL can automatically generate trait implementations from the structure of a type. This eliminates boilerplate for common traits:
+
+```japl
+type Point deriving(Eq, Ord, Show, Serialize) =
+  { x: Float, y: Float }
+```
+
+The compiler inspects the type's structure and generates the appropriate implementations:
+
+- `Eq` compares all fields for structural equality.
+- `Ord` compares fields in declaration order.
+- `Show` produces a string representation of the type.
+- `Serialize` / `Deserialize` generates wire format encoders/decoders.
+
+Derivable traits include: `Eq`, `Ord`, `Show`, `Serialize`, `Deserialize`.
+
+For sum types, deriving works on each variant:
+
+```japl
+type Shape deriving(Eq, Show) =
+  | Circle(Float)
+  | Rectangle(Float, Float)
+  | Triangle(Float, Float, Float)
+```
+
+## Trait Bounds
+
+When writing polymorphic functions that need specific operations on type parameters, use trait bounds in `where` clauses:
+
+```japl
+fn sort[a](list: List[a]) -> List[a] where Ord[a] =
+  -- Ord[a] guarantees we can compare elements
+  merge_sort(list)
+
+fn print_all[a](items: List[a]) -> Unit with Io where Show[a] =
+  List.each(items, fn item -> Io.println(show(item)))
+```
+
+Trait bounds are constraints: the function only accepts types that satisfy the listed traits. The compiler verifies at each call site that the concrete type has the required implementation.
+
+Multiple bounds can be combined:
+
+```japl
+fn serialize_sorted[a](items: List[a]) -> Bytes where Ord[a], Serialize[a] =
+  items
+  |> sort
+  |> serialize
+```
+
+## Trait Resolution
+
+At each call site requiring a trait, the compiler resolves the implementation deterministically:
+
+1. Look for a direct `impl` for the concrete type.
+2. Look for a parametric `impl` matching the type structure.
+3. If a `where` clause introduces the constraint, use the dictionary passed by the caller.
+
+Resolution is deterministic: overlapping implementations are a compile error. This prevents the ambiguity that can arise in languages with more flexible resolution strategies.
+
+> **Comparison with Other Languages**
+>
+> **Haskell:** Type classes are the direct inspiration for JAPL's traits. The main differences: JAPL uses `impl` blocks instead of `instance` declarations, and JAPL prohibits overlapping instances entirely (Haskell allows them with extensions).
+>
+> **Rust:** Rust traits are very similar to JAPL's, including the orphan rule and `where` clauses. The key difference is that Rust traits can have associated types, default implementations, and `dyn Trait` for dynamic dispatch. JAPL starts simpler and may add these features later.
+>
+> **Go:** Go interfaces are structurally satisfied (no explicit `impl`), while JAPL traits require explicit implementations. JAPL's approach catches missing implementations at the definition site rather than the use site.
+
+## The Orphan Rule
+
+An `impl` block must be defined in the same module as either the trait or the implementing type. This is called the **orphan rule** and prevents conflicting implementations from different modules.
+
+```japl
+-- In module MyTypes:
+type MyPoint = { x: Float, y: Float }
+
+-- This impl is allowed because MyPoint is defined in this module
+impl Show[MyPoint] =
+  fn show(p) = "(" ++ Float.to_string(p.x) ++ ", " ++ Float.to_string(p.y) ++ ")"
+```
+
+Without the orphan rule, two different modules could provide conflicting `impl Show[Int]` blocks, and the compiler would not know which to use.
+
+## Common Patterns
+
+### Trait-Based Polymorphism
+
+Use traits to write functions that work across many types:
+
+```japl
+fn to_json[a](value: a) -> String where Show[a], Serialize[a] =
+  let bytes = serialize(value)
+  Bytes.to_string(bytes)
+```
+
+### Newtype Pattern
+
+Wrap a type to provide a different trait implementation:
+
+```japl
+type ReverseOrd[a] = ReverseOrd(a)
+
+impl Ord[ReverseOrd[a]] where Ord[a] =
+  fn compare(ReverseOrd(x), ReverseOrd(y)) =
+    match compare(x, y) with
+    | Lt -> Gt
+    | Gt -> Lt
+    | Eq -> Eq
+```
+
+### Extension via Traits
+
+Add new behavior to existing types without modifying them:
+
+```japl
+trait Printable[a] =
+  fn to_debug_string(value: a) -> String
+
+impl Printable[User] =
+  fn to_debug_string(user) =
+    "User(id=" ++ Int.to_string(user.id) ++ ", name=" ++ user.name ++ ")"
+```
+
+### Trait Hierarchies
+
+Build trait hierarchies for progressively stronger guarantees:
+
+```japl
+trait Eq[a] =
+  fn eq(x: a, y: a) -> Bool
+
+trait Ord[a] where Eq[a] =
+  fn compare(x: a, y: a) -> Ordering
+
+trait Hash[a] where Eq[a] =
+  fn hash(value: a) -> Int
+
+-- Map requires Ord for keys; HashMap requires Hash
+fn tree_insert[k, v](map: TreeMap[k, v], key: k, value: v) -> TreeMap[k, v] where Ord[k] = ...
+fn hash_insert[k, v](map: HashMap[k, v], key: k, value: v) -> HashMap[k, v] where Hash[k] = ...
+```
+
+## Best Practices
+
+**Use `deriving` whenever possible.** For standard traits like `Eq`, `Show`, and `Serialize`, the derived implementations are correct and eliminate boilerplate.
+
+**Keep traits small and focused.** A trait with one or two methods is easier to implement and compose than a trait with ten methods. If a trait is growing large, consider splitting it into multiple smaller traits with a supertrait relationship.
+
+**Follow the orphan rule intentionally.** Put trait implementations in the module where they make the most sense -- typically with the implementing type. This keeps related code together.
+
+**Use trait bounds, not concrete types.** When a function needs to compare elements, take `where Ord[a]` rather than requiring a specific type. This makes your functions more reusable.
+
+**Prefer explicit implementations over structural matching.** JAPL requires explicit `impl` blocks rather than structural satisfaction (like Go interfaces). This makes it clear which types support which operations and catches missing implementations early.
+
+**Design trait hierarchies carefully.** Supertrait relationships create obligations: implementing `Ord` requires implementing `Eq`. Make sure these obligations are reasonable for all types that might implement the trait.

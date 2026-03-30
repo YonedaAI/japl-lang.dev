@@ -1,0 +1,207 @@
+---
+title: "Wire Protocol"
+description: "Reference for JAPL's distribution wire protocol covering message serialization, node handshake, and protocol versioning."
+status: "preview"
+order: 5
+section: "reference"
+prev: { title: "Configuration", slug: "reference/04-config" }
+---
+
+# Wire Protocol
+
+JAPL treats distribution as a first-class language concern. The wire protocol defines how nodes communicate over TCP, how messages are serialized for transit, and how protocol versions are negotiated during upgrades.
+
+> **Status: Preview.** The wire protocol is defined in the language specification but the implementation is in active development. The format described here may change in future releases.
+
+---
+
+## Overview
+
+JAPL's distribution model is built on location-transparent process identifiers. A `Pid[Msg]` may refer to a process on the local node or a remote node. The wire protocol handles the mechanics of making this transparency work: node discovery, connection establishment, message serialization, and failure detection.
+
+---
+
+## Node Addressing
+
+A node is a running instance of the JAPL runtime. Nodes are identified by a name and a TCP listen address.
+
+```japl
+let node = Node.start(
+  name = "web-1",
+  cookie = Env.get("CLUSTER_COOKIE"),
+  listen = "0.0.0.0:9000",
+)
+```
+
+Nodes connect to each other via TCP:
+
+```japl
+let remote = Node.connect("worker-1.internal:9000")
+```
+
+Each node has a unique name within the cluster. The `cookie` parameter provides a shared secret used for authentication during the handshake.
+
+---
+
+## Node Handshake
+
+When two nodes connect, they perform a handshake to establish a trusted, versioned communication channel.
+
+### Handshake Sequence
+
+1. **TCP connection** -- The initiating node opens a TCP connection to the target node's listen address.
+2. **Name exchange** -- Both nodes send their name and protocol version.
+3. **Cookie verification** -- Both nodes verify that the peer's cookie matches their own. If cookies do not match, the connection is rejected.
+4. **Capability negotiation** -- Nodes exchange their supported protocol features and agree on a common feature set.
+5. **Connection established** -- The connection enters the active state. Both nodes begin monitoring the connection for liveness.
+
+### Connection Monitoring
+
+Active connections are monitored with periodic heartbeat messages. If a heartbeat is not received within the configured timeout, the connection is considered lost. When a connection drops:
+
+- All monitors on processes hosted by the disconnected node fire with a `NodeDown` reason.
+- Pending messages to processes on the disconnected node are discarded.
+- The runtime may attempt automatic reconnection depending on configuration.
+
+---
+
+## Message Serialization
+
+Messages sent between nodes are serialized using JAPL's type-derived serialization format. The format is a compact binary encoding derived from the algebraic structure of JAPL types.
+
+### Serialization Rules
+
+Serialization is defined inductively over the type structure:
+
+1. **Primitive types** -- `Int`, `Float`, `Bool`, `String`, `Bytes`, and `Unit` have fixed serialization formats.
+2. **Sum types** -- Serialized as a tag byte identifying the variant, followed by the serialized fields of that variant.
+3. **Product types (records)** -- Serialized as the concatenation of all field values in declaration order.
+4. **Container types** -- `List[a]` is serialized as a length prefix followed by serialized elements. `Option[a]` uses a tag byte (`0` for `None`, `1` for `Some`) followed by the value if present.
+5. **Pid values** -- Always serializable. Serialized as a node identifier plus a process-local identifier.
+6. **Function types** -- Not serializable. Closures cannot cross node boundaries. The compiler enforces this constraint at the call site of `Process.spawn_on`.
+
+### Deriving Serialization
+
+Types opt into serialization with the `deriving` clause:
+
+```japl
+type JobRequest deriving(Serialize, Deserialize) = {
+  id: Int,
+  payload: Bytes,
+  priority: Priority,
+}
+```
+
+The compiler generates efficient encoders and decoders from the type definition. Serialization is a faithful round-trip: for any serializable type `T` and value `v : T`, `deserialize(serialize(v)) == v`.
+
+### Serialization Constraints
+
+The `Serialize` trait constraint is enforced on all values captured by a function passed to `Process.spawn_on`. This prevents runtime serialization failures by catching non-serializable closures at compile time.
+
+```japl
+-- Compile error: fn values are not serializable
+let pid = Process.spawn_on(remote_node, fn() {
+  let f = fn(x) { x + 1 }  -- captured closure
+  worker_loop(f)
+})
+```
+
+---
+
+## Protocol Versioning
+
+When a type's definition changes between deployments, JAPL provides compatibility rules for rolling upgrades. The wire protocol includes version information so that nodes running different code versions can communicate safely.
+
+### Compatible Changes
+
+The following changes are backward-compatible and do not require coordinated deployment:
+
+- **Adding a new variant to a sum type** -- Existing variants remain at the same tag positions. A node that does not know the new variant will fail to deserialize messages containing it, but this is handled gracefully by the error system.
+- **Adding an optional field to a record** -- The new field is appended to the end of the serialized representation and includes a default value for nodes that do not expect it.
+
+### Incompatible Changes
+
+The following changes are breaking and require coordinated deployment or a migration strategy:
+
+- **Removing a variant** from a sum type.
+- **Changing a field's type** in a record.
+- **Reordering constructors** in a sum type (the binary format depends on tag order).
+- **Renaming a variant** (treated as removing the old variant and adding a new one).
+
+### Version Checking
+
+The compiler can check compatibility between two versions of a type definition:
+
+```bash
+japlc check-compat v1/types.japl v2/types.japl
+```
+
+This reports whether a rolling upgrade between the two versions is safe, listing any breaking changes that require coordination.
+
+---
+
+## Remote Process Spawning
+
+When a process is spawned on a remote node, the function body and its captured environment are serialized and sent to the remote node for execution.
+
+```japl
+let pid = Process.spawn_on(remote_node, fn() { image_processor() })
+```
+
+The returned `Pid[Msg]` is usable from the local node. Messages sent to the PID are transparently routed over the network connection to the remote node.
+
+### Constraints
+
+- The function passed to `spawn_on` must not close over non-serializable values.
+- All captured values must satisfy the `Serialize` constraint. The compiler enforces this.
+- The remote node must have access to the code for the spawned function (either through shared deployment or code loading).
+
+---
+
+## Service Discovery
+
+The runtime provides built-in primitives for service registration and lookup across a cluster.
+
+```japl
+-- Register a process under a name
+Registry.register("image-processor", Process.self())
+
+-- Look up processes by name from any node
+let workers = Registry.lookup(registry, "image-processor")
+```
+
+Service discovery operates across node boundaries. A process registered on one node can be looked up from any connected node in the cluster.
+
+---
+
+## Cross-Node Monitoring
+
+Process monitoring works transparently across node boundaries:
+
+```japl
+Process.monitor(remote_pid)
+
+match Process.receive() {
+  ProcessDown(ref, pid, reason) => handle_failure(reason)
+}
+```
+
+If the network connection to the remote node is lost, the monitor triggers with a `NodeDown` reason, allowing the local process to handle network partitions explicitly.
+
+---
+
+## Transport Layer
+
+The wire protocol operates over TCP. The transport layer provides:
+
+- **Framing** -- Each message is length-prefixed to support variable-length messages over the stream-oriented TCP connection.
+- **Ordering** -- Messages between any two processes are delivered in the order they were sent (guaranteed by TCP).
+- **Best-effort delivery** -- For remote sends, message delivery is best-effort. Network partitions or node failures may cause message loss. Applications that require guaranteed delivery should implement acknowledgment protocols at the application level.
+
+---
+
+## Security
+
+Node-to-node communication is authenticated via the shared cookie mechanism during the handshake. The cookie prevents unauthorized nodes from joining the cluster.
+
+For production deployments, the transport layer should be wrapped in TLS to provide encryption and prevent eavesdropping. TLS configuration is planned for a future release.

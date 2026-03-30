@@ -1,0 +1,173 @@
+{
+  "name": "japl",
+  "scopeName": "source.japl",
+  "fileTypes": ["japl"],
+  "aliases": ["JAPL"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#chars" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#operators" },
+    { "include": "#functions" },
+    { "include": "#constants" },
+    { "include": "#identifiers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.documentation.japl",
+          "match": "---.*$"
+        },
+        {
+          "name": "comment.line.double-dash.japl",
+          "match": "--.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.japl",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.japl",
+              "match": "\\\\[nrt\\\\0'\"\\{\\}]"
+            },
+            {
+              "name": "meta.interpolation.japl",
+              "begin": "\\$\\{",
+              "end": "\\}",
+              "patterns": [{ "include": "$self" }]
+            }
+          ]
+        }
+      ]
+    },
+    "chars": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.japl",
+          "match": "'([^'\\\\]|\\\\[nrt\\\\0']|\\\\u\\{[0-9a-fA-F]+\\})'"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.japl",
+          "match": "\\b0x[0-9a-fA-F][0-9a-fA-F_]*\\b"
+        },
+        {
+          "name": "constant.numeric.binary.japl",
+          "match": "\\b0b[01][01_]*\\b"
+        },
+        {
+          "name": "constant.numeric.octal.japl",
+          "match": "\\b0o[0-7][0-7_]*\\b"
+        },
+        {
+          "name": "constant.numeric.float.japl",
+          "match": "\\b[0-9][0-9_]*\\.[0-9][0-9_]*([eE][+-]?[0-9]+)?\\b"
+        },
+        {
+          "name": "constant.numeric.integer.japl",
+          "match": "\\b[0-9][0-9_]*\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.japl",
+          "match": "\\b(fn|let|match|with|if|then|else|use|receive|spawn|send|return|loop|while|do|continue|done|fail|panic|in|on)\\b"
+        },
+        {
+          "name": "keyword.declaration.japl",
+          "match": "\\b(type|module|import|trait|impl|deriving|signature|foreign|pub|alias|opaque)\\b"
+        },
+        {
+          "name": "keyword.other.japl",
+          "match": "\\b(own|ref|unsafe|test|property|forall|assert|where|packed|bench|supervisor|strategy|child|resource|process|as)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.japl",
+          "match": "\\b(True|False)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "entity.name.type.japl",
+          "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.pipe.japl",
+          "match": "\\|>"
+        },
+        {
+          "name": "keyword.operator.compose.japl",
+          "match": ">>"
+        },
+        {
+          "name": "keyword.operator.arrow.japl",
+          "match": "->"
+        },
+        {
+          "name": "keyword.operator.fat-arrow.japl",
+          "match": "=>"
+        },
+        {
+          "name": "keyword.operator.diamond.japl",
+          "match": "<>"
+        },
+        {
+          "name": "keyword.operator.comparison.japl",
+          "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "name": "keyword.operator.logical.japl",
+          "match": "&&|\\|\\|"
+        },
+        {
+          "name": "keyword.operator.arithmetic.japl",
+          "match": "[+\\-*/%]"
+        },
+        {
+          "name": "keyword.operator.other.japl",
+          "match": "\\?|\\^|\\+\\+|\\.\\.|::"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.japl",
+          "match": "(?<=fn\\s+)[a-z_][a-zA-Z0-9_]*"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "variable.other.japl",
+          "match": "\\b[a-z_][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    }
+  }
+}

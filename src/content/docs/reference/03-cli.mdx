@@ -1,0 +1,218 @@
+---
+title: "CLI Reference"
+description: "Complete reference for the japlc command-line compiler including all commands and flags."
+status: "stable"
+order: 3
+section: "reference"
+prev: { title: "Grammar", slug: "reference/02-grammar" }
+next: { title: "Configuration", slug: "reference/04-config" }
+---
+
+# CLI Reference
+
+The `japlc` command is the JAPL compiler driver. It reads `.japl` source files, lexes, parses, lowers to IR, and interprets them. This page documents all available commands and flags.
+
+---
+
+## Installation
+
+After building the compiler from source:
+
+```bash
+cargo install --path compiler/crates/japl-driver
+```
+
+This installs the `japlc` binary to your Cargo bin directory.
+
+---
+
+## Usage
+
+```bash
+japlc [OPTIONS] <file.japl>
+japlc run <file.japl>
+```
+
+The compiler accepts a `.japl` source file either as a direct argument or through the `run` subcommand. Both forms are equivalent for execution.
+
+---
+
+## Commands
+
+### `run`
+
+Run a JAPL program through the full pipeline: lex, parse, lower to IR, and interpret.
+
+```bash
+japlc run hello.japl
+```
+
+This is equivalent to passing the file directly:
+
+```bash
+japlc hello.japl
+```
+
+---
+
+## Flags
+
+All flags are global and can be used with or without the `run` subcommand.
+
+### `--tokens`
+
+Print the token stream produced by the lexer and exit. Does not parse or execute the program. Useful for debugging lexer behavior.
+
+```bash
+japlc hello.japl --tokens
+```
+
+Output format shows byte offsets, token type, and token text for each token:
+
+```text
+   0..   2  Fn  "fn"
+   3..   7  LowerIdent  "main"
+   7..   8  LParen  "("
+   8..   9  RParen  ")"
+  10..  12  Arrow  "->"
+  ...
+```
+
+### `--ast`
+
+Parse the source file and print the pretty-printed abstract syntax tree. Does not lower to IR or execute.
+
+```bash
+japlc hello.japl --ast
+```
+
+This produces a human-readable representation of the parsed AST, useful for verifying that the parser interprets your code correctly.
+
+### `--check`
+
+Type-check the source file without executing it. Currently a placeholder that verifies parsing succeeds.
+
+```bash
+japlc hello.japl --check
+```
+
+Output on success:
+
+```text
+Parse successful. Type checking not yet connected.
+```
+
+This flag will perform full type checking, effect checking, and linearity checking once those compiler stages are wired in.
+
+### `--ir`
+
+Parse and lower the source file to intermediate representation, then print the IR and exit. Does not interpret.
+
+```bash
+japlc hello.japl --ir
+```
+
+Output shows the IR program structure including function definitions and type definitions:
+
+```text
+--- IR Program ---
+Functions: 2
+  fn main() = ...
+  fn helper(x, y) = ...
+Type definitions: 1
+  type Shape =
+    | Circle(1)
+    | Rectangle(2)
+```
+
+### `--version`
+
+Print the compiler version and exit.
+
+```bash
+japlc --version
+```
+
+### `--help`
+
+Print usage information and exit.
+
+```bash
+japlc --help
+```
+
+---
+
+## Pipeline Stages
+
+When no diagnostic flags are provided, `japlc` runs the full pipeline:
+
+1. **Lex** -- Tokenizes the source file using a DFA-based lexer (powered by `logos`). Produces a stream of tokens with source spans.
+2. **Parse** -- Builds an untyped AST from the token stream. Reports parse errors with source locations.
+3. **Lower** -- Transforms the AST into an intermediate representation (IR) suitable for interpretation or code generation.
+4. **Interpret** -- Executes the IR program using the tree-walking interpreter.
+
+Each stage produces structured diagnostics. Errors carry source spans, severity levels, and optional fix suggestions.
+
+---
+
+## Error Reporting
+
+The compiler reports errors with source locations in the format `file:line:column`:
+
+```text
+error: unexpected token [hello.japl:3:5]
+  note: expected ')' but found '}'
+```
+
+Diagnostic severities include:
+
+| Severity | Meaning |
+|----------|---------|
+| `error` | Compilation cannot continue |
+| `warning` | Potential issue, compilation continues |
+| `info` | Informational message |
+| `hint` | Suggestion for improvement |
+
+---
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `1` | Compilation error, missing input file, or runtime error |
+
+---
+
+## Examples
+
+Run a program:
+
+```bash
+japlc run examples/hello.japl
+```
+
+Inspect the token stream:
+
+```bash
+japlc examples/hello.japl --tokens
+```
+
+View the parsed AST:
+
+```bash
+japlc examples/hello.japl --ast
+```
+
+Check for parse errors without running:
+
+```bash
+japlc examples/hello.japl --check
+```
+
+Inspect the lowered IR:
+
+```bash
+japlc examples/hello.japl --ir
+```

@@ -1,0 +1,169 @@
+---
+title: "Pattern Matching"
+description: "Learn how JAPL's pattern matching destructures data, handles every case, and eliminates runtime surprises."
+status: "stable"
+order: 4
+section: "tour"
+prev: { title: "Functions", slug: "docs/tour/03-functions" }
+next: { title: "Error Handling", slug: "docs/tour/05-errors" }
+---
+
+# Pattern Matching
+
+Pattern matching is one of JAPL's most important features. A `match` expression inspects a value, destructures it, and runs the appropriate branch. The compiler verifies that every possible case is handled, so you never forget an edge case.
+
+## Basic Matching
+
+Match on sum type variants to decide what to do:
+
+```japl
+type Light =
+  | Red
+  | Yellow
+  | Green
+
+fn light_name(light: Light) -> String {
+  match light {
+    Red => "RED"
+    Yellow => "YELLOW"
+    Green => "GREEN"
+  }
+}
+```
+
+Each arm of the match consists of a pattern and a body, separated by `=>`. The first matching pattern wins.
+
+## Destructuring Variants
+
+When a variant carries data, pattern matching extracts it into bound variables:
+
+```japl
+type Expr =
+  | Num(Int)
+  | Add(Expr, Expr)
+  | Mul(Expr, Expr)
+  | Neg(Expr)
+
+fn evaluate(expr: Expr) -> Int {
+  match expr {
+    Num(n) => n
+    Add(a, b) => evaluate(a) + evaluate(b)
+    Mul(a, b) => evaluate(a) * evaluate(b)
+    Neg(e) => 0 - evaluate(e)
+  }
+}
+```
+
+The variables `n`, `a`, `b`, and `e` are bound only within their respective branch.
+
+## Nested Patterns
+
+Patterns can nest arbitrarily deep. Here, the outer match on `action` contains an inner match on `light`:
+
+```japl
+type Action =
+  | Next
+  | Emergency
+
+fn transition(light: Light, action: Action) -> Light {
+  match action {
+    Emergency => Red
+    Next => match light {
+      Red => Green
+      Green => Yellow
+      Yellow => Red
+    }
+  }
+}
+```
+
+You can also match on recursive structures. This function computes the depth of a tree by matching on its branches:
+
+```japl
+type Tree =
+  | Leaf(Int)
+  | Branch(Tree, Tree)
+
+fn depth(t: Tree) -> Int {
+  match t {
+    Leaf(_) => 1
+    Branch(left, right) =>
+      let ld = depth(left)
+      let rd = depth(right)
+      if ld > rd { ld + 1 } else { rd + 1 }
+  }
+}
+```
+
+## The Wildcard Pattern
+
+Use `_` to match any value without binding it to a name. This is useful when you do not need the data:
+
+```japl
+fn is_some(opt: Option) -> Bool {
+  match opt {
+    Some(_) => True
+    None => False
+  }
+}
+```
+
+## Matching on Option and Result
+
+Pattern matching is the standard way to work with `Option` and `Result` types:
+
+```japl
+fn unwrap_or(opt: Option, fallback: Int) -> Int {
+  match opt {
+    Some(x) => x
+    None => fallback
+  }
+}
+
+fn describe(r: Result) -> String {
+  match r {
+    Ok(n) => "Success: " <> show(n)
+    Err(e) => "Error: " <> e
+  }
+}
+```
+
+## Building Complex Expressions
+
+Pattern matching works naturally with recursive types to build interpreters, compilers, and evaluators. Here is a complete expression pretty-printer:
+
+```japl
+fn show_expr(expr: Expr) -> String {
+  match expr {
+    Num(n) => show(n)
+    Add(a, b) => "(" <> show_expr(a) <> " + " <> show_expr(b) <> ")"
+    Mul(a, b) => "(" <> show_expr(a) <> " * " <> show_expr(b) <> ")"
+    Neg(e) => "(-" <> show_expr(e) <> ")"
+  }
+}
+```
+
+Combine it with the evaluator:
+
+```japl
+fn main() {
+  let expr = Add(Mul(Num(3), Num(4)), Neg(Num(5)))
+  println("Expression: " <> show_expr(expr))
+  println("Result: " <> show(evaluate(expr)))
+}
+```
+
+This prints:
+
+```
+Expression: ((3 * 4) + (-5))
+Result: 7
+```
+
+## Exhaustiveness
+
+The compiler requires that every match is exhaustive -- all possible variants must be covered. If you forget a case, you get a compile error, not a runtime crash. This guarantee is one of the most valuable properties of JAPL's type system.
+
+## Next Steps
+
+Pattern matching on `Result` and `Option` is the foundation of error handling in JAPL. Learn more in [Error Handling](/docs/tour/05-errors).

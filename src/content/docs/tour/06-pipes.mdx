@@ -1,0 +1,133 @@
+---
+title: "Pipes & Composition"
+description: "Learn how JAPL's pipe operator and function composition build clean data transformation pipelines."
+status: "stable"
+order: 6
+section: "tour"
+prev: { title: "Error Handling", slug: "docs/tour/05-errors" }
+next: { title: "Effects", slug: "docs/tour/07-effects" }
+---
+
+# Pipes & Composition
+
+JAPL provides two operators for combining functions: the **pipe** operator `|>` and the **composition** operator `>>`. Together they let you build data transformation pipelines that read left to right, the way you think about data flowing through your program.
+
+## The Pipe Operator
+
+The pipe operator `|>` takes a value on the left and passes it as the argument to the function on the right:
+
+```japl
+let result = 5 |> double
+-- equivalent to: double(5)
+```
+
+The real power of pipes comes from chaining multiple transformations:
+
+```japl
+fn double(x: Int) -> Int { x * 2 }
+fn to_str(x: Int) -> String { show(x) }
+
+fn main() {
+  let result = 5 |> double |> double
+  println(show(result))  -- prints 20
+
+  let msg = 42 |> to_str
+  println(msg)           -- prints 42
+}
+```
+
+Without pipes, the same code would use nested function calls that read inside-out:
+
+```japl
+-- Without pipes (harder to follow)
+let result = double(double(5))
+
+-- With pipes (reads left to right)
+let result = 5 |> double |> double
+```
+
+## Building Pipelines
+
+Pipes shine when you chain several steps together. Each step takes the output of the previous step as input:
+
+```japl
+fn add_one(x: Int) -> Int { x + 1 }
+fn double(x: Int) -> Int { x * 2 }
+fn to_str(x: Int) -> String { show(x) }
+
+fn main() {
+  let result = 5
+    |> add_one
+    |> double
+    |> double
+    |> to_str
+  println(result)  -- prints 48
+}
+```
+
+This is equivalent to `to_str(double(double(add_one(5))))`, but the pipeline version makes the sequence of operations immediately obvious.
+
+## Function Composition
+
+The composition operator `>>` creates a new function by combining two functions. The result of the first function is passed to the second:
+
+```japl
+let double_then_square = double >> square
+-- equivalent to: fn(x) { square(double(x)) }
+```
+
+Where pipes operate on values, composition operates on functions. Use composition when you want to build a reusable transformation without applying it immediately:
+
+```japl
+fn double(x: Int) -> Int { x * 2 }
+fn add_one(x: Int) -> Int { x + 1 }
+
+let transform = double >> add_one
+-- transform is a new function: fn(Int) -> Int
+
+let result = transform(5)  -- double(5) = 10, add_one(10) = 11
+```
+
+## Pipes vs Composition
+
+Both operators express "do this, then that," but they serve different purposes:
+
+| Operator | Operates on | Use when |
+|----------|------------|----------|
+| `\|>` | A value | You have data and want to transform it now |
+| `>>` | Functions | You want to build a reusable transformation |
+
+A pipe applies transformations immediately. Composition saves the combined transformation for later use.
+
+```japl
+-- Pipe: transform a value right now
+let result = 5 |> double |> add_one
+
+-- Compose: build a function for later
+let transform = double >> add_one
+let result = transform(5)
+```
+
+## Data Processing Patterns
+
+Pipes encourage a style where data flows through a series of named, single-purpose functions. Each function does one thing and the pipeline shows the full sequence:
+
+```japl
+fn parse(input: String) -> Int { string_to_int(input) }
+fn validate(n: Int) -> Int { if n > 0 { n } else { 0 } }
+fn format(n: Int) -> String { "Result: " <> show(n) }
+
+fn process(input: String) -> String {
+  input
+    |> parse
+    |> validate
+    |> double
+    |> format
+}
+```
+
+This pattern makes code easy to read, test, and modify. Adding a step means adding one line. Removing a step means deleting one line. Each function is independently testable.
+
+## Next Steps
+
+Pure pipelines are powerful, but real programs need to interact with the outside world. Learn how JAPL tracks side effects in [Effects](/docs/tour/07-effects).

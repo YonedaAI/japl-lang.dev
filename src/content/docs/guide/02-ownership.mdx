@@ -1,0 +1,243 @@
+---
+title: "Ownership & Linearity"
+description: "Deep dive into JAPL's dual-layer memory model with linear types, owned resources, use bindings, and borrowing."
+status: "preview"
+order: 2
+section: "guide"
+prev: { title: "Type System", slug: "guide/01-type-system" }
+next: { title: "Effect System", slug: "guide/03-effects" }
+---
+
+# Ownership & Linearity
+
+Most programming languages force you to choose between safety and control. Garbage-collected languages like Go and Erlang give you safety but hide resource management. Systems languages like Rust give you control but ask you to annotate lifetimes everywhere. JAPL takes a different approach: a **dual-layer** memory model where most code lives in a simple, garbage-collected pure layer, and resource management is handled by a separate linear typing layer only when you actually need it.
+
+This separation means that the vast majority of JAPL code -- pure functions transforming immutable data -- requires no ownership annotations at all. But when you open a file, connect to a database, or allocate a GPU buffer, the linear type system ensures you cannot forget to close it, use it after closing, or accidentally duplicate it.
+
+## The Dual-Layer Model
+
+JAPL's memory model consists of two distinct layers, each with its own typing rules and memory management strategy.
+
+### Pure Layer
+
+The pure layer is where most JAPL code lives. All values here are immutable. Once constructed, a value cannot be observably modified. Values can be freely shared, duplicated, and discarded.
+
+Memory management uses a generational, per-process garbage collector. Because values are immutable, no write barriers are needed, and GC in one process does not pause other processes.
+
+Standard structural typing rules apply: a pure value `x : T` may be used zero or more times.
+
+```japl
+let data = [1, 2, 3, 4, 5]
+let copy = data  -- sharing is fine; data is immutable
+let _ = data     -- discarding is fine too
+```
+
+### Resource Layer
+
+Resources are mutable external handles: file handles, network sockets, GPU buffers, FFI pointers. Each resource has exactly one owner at any time. Resources must be consumed exactly once.
+
+Memory management is ownership-tracked. Resources are deterministically released when consumed (for example, by calling `close`) or when the owning scope exits. There is no GC involvement.
+
+Linear typing rules apply: a resource `x : own T` must be used exactly once. You cannot silently drop it, and you cannot use it twice.
+
+```japl
+-- Resource layer: ownership-tracked, must be consumed
+fn process_file(path: String) -> Result[String, IoError] with Io =
+  use file = File.open(path, Read)?
+  let contents = File.read_all(file)?
+  File.close(file)  -- consumed here; forgetting this is a compile error
+  Ok(contents)
+```
+
+### Layer Summary
+
+| Layer | Mutability | Memory | Sharing | Typing |
+|-------|-----------|--------|---------|--------|
+| Pure | Immutable | GC (per-process, generational) | Free | Unrestricted |
+| Resource | Mutable | Ownership-tracked, deterministic | Single owner | Linear |
+
+## The `use` Binding
+
+The `use` keyword introduces a linear binding -- a resource that the compiler tracks for exactly-once consumption. Failing to consume a `use`-bound resource is a compile error.
+
+```japl
+fn example() -> Unit with Io =
+  use conn = Db.connect(url)?        -- conn is owned here
+  let result = Db.query(ref conn, sql)?  -- borrow for query
+  Db.close(conn)                     -- ownership consumed, resource freed
+  -- conn cannot be used here: compile error
+```
+
+The difference between `let` and `use` is fundamental:
+
+- `let` creates an unrestricted binding. The value can be used any number of times (including zero).
+- `use` creates a linear binding. The resource must be used exactly once.
+
+If you try to bind a resource with `let` instead of `use`, the compiler will reject it. This prevents accidentally ignoring a resource that needs explicit cleanup.
+
+## Ownership Transfer
+
+Ownership can be transferred via function parameters qualified with `own`:
+
+```japl
+fn send_to_worker(buf: own Buffer, pid: Pid[WorkerMsg]) -> Unit =
+  Process.send(pid, ProcessBuffer(buf))
+  -- `buf` is moved; using it here is a compile error
+```
+
+After transfer, the original binding is consumed and cannot be referenced. This is similar to Rust's move semantics, but JAPL's version is simpler because it only applies to the resource layer. Pure values are never moved -- they are freely copyable.
+
+```japl
+fn transfer_example() -> Unit with Io =
+  use socket = Tcp.connect("example.com", 80)?
+  hand_off(socket)       -- ownership transferred
+  -- socket is consumed; this would be a compile error:
+  -- Tcp.send(socket, data)
+```
+
+## Borrowing
+
+The `ref` qualifier allows temporary, read-only access to a resource without consuming it:
+
+```japl
+fn peek(buf: ref Buffer) -> Byte =
+  Buffer.get(buf, 0)
+```
+
+Borrowing follows four rules:
+
+1. A `ref` borrow does not consume the resource.
+2. The resource cannot be consumed (moved or closed) while any `ref` borrow is live.
+3. Multiple `ref` borrows may coexist.
+4. There are no mutable borrows; mutation of a resource requires exclusive ownership (`own`).
+
+```japl
+fn inspect_and_close(buf: own Buffer) -> Unit with Io =
+  let first = peek(ref buf)   -- borrow: ok, buf is still owned
+  let second = peek(ref buf)  -- multiple borrows: ok
+  Buffer.free(buf)             -- consume: ok, no borrows are live
+```
+
+> **Comparison with Other Languages**
+>
+> JAPL's borrowing is significantly simpler than Rust's. There are no lifetime annotations, no mutable borrows, and no borrow checker fighting you on complex data structures. This is possible because JAPL's pure layer handles all immutable data via GC, so borrowing only applies to the relatively small set of linear resources. Rust needs its full borrow checker because *all* data goes through ownership -- JAPL only needs linearity checking for resources.
+
+## Region-Based Inference
+
+The compiler performs region inference to determine the lifetime of each resource. It automatically inserts release operations at scope boundaries when the programmer does not explicitly consume the resource. This means that if you forget to close a file, you get a compile error telling you exactly which resource was not consumed -- rather than a runtime resource leak.
+
+## Typing Judgments
+
+Under the hood, JAPL's dual-layer type system uses a mixed context `Gamma; Delta` where:
+
+- `Gamma` is the unrestricted (pure) context: variables may be used any number of times.
+- `Delta` is the linear (resource) context: variables must each be used exactly once.
+
+The typing judgment takes the form:
+
+```
+Gamma; Delta |- e : T
+```
+
+Pure values implicitly carry the exponential modality `!`, meaning they can be freely duplicated and discarded. This embedding rule lets you use pure values in linear contexts without ceremony:
+
+```japl
+fn process_with_config(config: Config, buf: own Buffer) -> Unit with Io =
+  -- `config` is pure (used freely), `buf` is linear (used exactly once)
+  let size = config.buffer_size   -- pure: unrestricted use
+  let data = Buffer.read(buf, size)
+  Buffer.free(buf)                -- linear: consumed
+```
+
+## The Resource Lifecycle
+
+Resources follow a linear lifecycle: **acquire**, **use**, **release**.
+
+```japl
+fn process_file(path: String) -> Result[String, IoError] with Io =
+  -- 1. Acquire: `use` binds a linear resource
+  use file = File.open(path, Read)?
+
+  -- 2. Use: borrow for reading
+  let contents = File.read_all(file)?
+
+  -- 3. Release: ownership consumed
+  File.close(file)
+  Ok(contents)
+```
+
+The compiler verifies each stage:
+- After acquisition, the resource is `Available`.
+- During use, borrowed references are tracked.
+- After release, the resource is `Consumed` and cannot be referenced.
+- If a resource is still `Available` at the end of its scope, the compiler reports an error.
+
+## Branching and Linearity
+
+When code branches (via `if`, `match`, or other constructs), the linearity checker requires that all branches consume the same set of resources. You cannot consume a resource in one branch and leave it unconsumed in another:
+
+```japl
+fn conditional_use(buf: own Buffer, flag: Bool) -> Unit with Io =
+  if flag then
+    Buffer.free(buf)    -- consumed in "then" branch
+  else
+    Buffer.free(buf)    -- must also be consumed in "else" branch
+  -- Both branches agree: buf is consumed. Compile succeeds.
+```
+
+If one branch consumes and the other does not, the compiler reports an error with both locations.
+
+## Common Patterns
+
+### Resource Wrapping
+
+Wrap unsafe foreign resources in safe JAPL interfaces that restore safety guarantees:
+
+```japl
+module SafeFile =
+  opaque type FileHandle
+
+  fn open(path: String, mode: FileMode) -> Result[own FileHandle, IoError] with Io =
+    use cpath = CString.from(path)
+    use cmode = CString.from(mode_string(mode))
+    let ptr = unsafe fopen(cpath, cmode)
+    if Ptr.is_null(ptr) then Err(IoError.last())
+    else Ok(FileHandle.from_raw(ptr))
+
+  fn close(handle: own FileHandle) -> Unit with Io =
+    let _ = unsafe fclose(FileHandle.to_raw(handle))
+    ()
+```
+
+### Transfer Between Processes
+
+Resources can be transferred between processes via message passing. The ownership system ensures that after sending, the original process can no longer access the resource:
+
+```japl
+fn producer(pid: Pid[WorkerMsg]) -> Unit with Io, Process =
+  use buf = Buffer.alloc(4096)
+  Buffer.write(buf, 0, data)
+  Process.send(pid, ProcessBuffer(buf))
+  -- buf is moved to the worker; cannot use it here
+```
+
+### The Freeze Pattern
+
+Convert a mutable resource into an immutable value to move it from the resource layer to the pure layer:
+
+```japl
+fn build_data() -> Bytes with Io =
+  use buf = Buffer.alloc(1024)
+  Buffer.write(buf, 0, data)
+  Buffer.freeze(buf)  -- converts owned Buffer to immutable Bytes
+```
+
+## Best Practices
+
+**Keep the resource layer thin.** Most JAPL code should live in the pure layer. Use `own` and `use` only for actual external resources -- files, sockets, database connections, FFI handles. Pure data transformations should never need ownership annotations.
+
+**Prefer short resource scopes.** Acquire a resource, use it, and release it as close together as possible. Long-lived resources increase the chance of linearity errors in complex control flow.
+
+**Use opaque types for resource wrappers.** Hide the raw resource behind an opaque type in a module, exposing only safe operations. This contains the `unsafe` code in one place.
+
+**Freeze mutable buffers when done writing.** If you need to build up data mutably and then share it, use the freeze pattern to convert from the resource layer to the pure layer.

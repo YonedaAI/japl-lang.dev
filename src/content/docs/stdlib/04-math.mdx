@@ -1,0 +1,168 @@
+---
+title: "Math"
+description: "Reference for the Math standard library module providing integer arithmetic utilities."
+status: "stable"
+order: 4
+section: "stdlib"
+prev: { title: "String", slug: "stdlib/03-string" }
+next: { title: "Option", slug: "stdlib/05-option" }
+---
+
+# Math
+
+The `Math` module provides integer arithmetic utility functions beyond the basic operators. All functions operate on the `Int` type.
+
+---
+
+## abs
+
+```japl
+fn abs(x: Int) -> Int
+```
+
+Returns the absolute value of an integer.
+
+### Example
+
+```japl
+Math.abs(-5)
+-- 5
+
+Math.abs(3)
+-- 3
+
+Math.abs(0)
+-- 0
+```
+
+---
+
+## max
+
+```japl
+fn max(a: Int, b: Int) -> Int
+```
+
+Returns the larger of two integers.
+
+### Example
+
+```japl
+Math.max(3, 7)
+-- 7
+
+Math.max(10, 10)
+-- 10
+```
+
+---
+
+## min
+
+```japl
+fn min(a: Int, b: Int) -> Int
+```
+
+Returns the smaller of two integers.
+
+### Example
+
+```japl
+Math.min(3, 7)
+-- 3
+
+Math.min(10, 10)
+-- 10
+```
+
+---
+
+## clamp
+
+```japl
+fn clamp(x: Int, low: Int, high: Int) -> Int
+```
+
+Restricts `x` to the range `[low, high]`. Returns `low` if `x < low`, `high` if `x > high`, and `x` otherwise.
+
+### Example
+
+```japl
+Math.clamp(5, 0, 10)
+-- 5
+
+Math.clamp(-3, 0, 10)
+-- 0
+
+Math.clamp(15, 0, 10)
+-- 10
+```
+
+---
+
+## pow
+
+```japl
+fn pow(base: Int, exp: Int) -> Int
+```
+
+Raises `base` to the power `exp`. Returns `1` if `exp` is zero or negative.
+
+### Example
+
+```japl
+Math.pow(2, 10)
+-- 1024
+
+Math.pow(3, 0)
+-- 1
+
+Math.pow(5, 3)
+-- 125
+```
+
+---
+
+## gcd
+
+```japl
+fn gcd(a: Int, b: Int) -> Int
+```
+
+Computes the greatest common divisor of two integers using the Euclidean algorithm.
+
+### Example
+
+```japl
+Math.gcd(12, 8)
+-- 4
+
+Math.gcd(7, 13)
+-- 1
+
+Math.gcd(100, 75)
+-- 25
+```
+
+---
+
+## lcm
+
+```japl
+fn lcm(a: Int, b: Int) -> Int
+```
+
+Computes the least common multiple of two integers.
+
+### Example
+
+```japl
+Math.lcm(4, 6)
+-- 12
+
+Math.lcm(3, 5)
+-- 15
+
+Math.lcm(7, 7)
+-- 7
+```

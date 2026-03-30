@@ -1,0 +1,138 @@
+---
+title: "Supervision"
+description: "Learn how JAPL's supervisor trees manage process failure with automatic restart strategies."
+status: "stable"
+order: 9
+section: "tour"
+prev: { title: "Processes", slug: "docs/tour/08-processes" }
+next: { title: "Building & Deploying", slug: "docs/tour/10-building" }
+---
+
+# Supervision
+
+Real systems fail. Networks drop, disks fill up, bugs slip through. JAPL embraces this reality with supervision trees -- a structured way to detect, isolate, and recover from failures automatically. Instead of writing defensive error-handling code for every possible thing that can go wrong, you let processes crash and supervisors restart them.
+
+## The "Let It Crash" Philosophy
+
+JAPL inherits Erlang's insight: the best response to an unexpected failure is often to restart with a clean state. Rather than trying to recover from corrupted state inside a process, you let the process crash and have a supervisor start a fresh one.
+
+This separates two concerns:
+- **Business logic** lives in worker processes and handles the happy path.
+- **Recovery logic** lives in supervisors and handles restarts.
+
+## Restart Strategies
+
+A supervisor watches a set of child processes and restarts them when they fail. The restart strategy determines which children are restarted:
+
+```japl
+type RestartStrategy =
+  | OneForOne      -- restart only the failed child
+  | AllForOne      -- restart all children if one fails
+  | RestForOne     -- restart the failed child and all started after it
+```
+
+**OneForOne** is the most common strategy. Each child is independent, so only the failed one is restarted.
+
+**AllForOne** is used when children depend on each other. If one fails, the state of the others may be invalid, so all are restarted together.
+
+**RestForOne** handles ordered dependencies. If child C depends on child B which depends on child A, and B crashes, then B and C are restarted but A is left alone.
+
+## Child Specifications
+
+Each child process is described by a spec that tells the supervisor how to start it and how to handle its lifecycle:
+
+```japl
+type ChildSpec =
+  { id: String
+  , start: fn() -> Never
+  , restart: Permanent | Transient | Temporary
+  , shutdown: Timeout(Int) | Brutal
+  }
+```
+
+The `restart` field controls when a child is restarted:
+- **Permanent**: Always restart, no matter why it stopped.
+- **Transient**: Restart only if it crashed (not if it exited normally).
+- **Temporary**: Never restart.
+
+The `shutdown` field controls how long the supervisor waits for a clean shutdown before forcing termination.
+
+## Starting a Supervisor
+
+A supervisor is itself a process. You start one by specifying a strategy, restart limits, and a list of child specs:
+
+```japl
+fn start_app() -> Pid[SupervisorMsg] with Process =
+  Supervisor.start(
+    strategy = OneForOne,
+    max_restarts = 5,
+    max_seconds = 60,
+    children = [
+      { id = "db_pool"
+      , start = fn -> DbPool.start(config.database)
+      , restart = Permanent
+      , shutdown = Timeout(5000)
+      },
+      { id = "http_server"
+      , start = fn -> HttpServer.start(config.http)
+      , restart = Permanent
+      , shutdown = Timeout(10000)
+      },
+      { id = "background_jobs"
+      , start = fn -> JobRunner.start(config.jobs)
+      , restart = Transient
+      , shutdown = Timeout(30000)
+      },
+    ]
+  )
+```
+
+The `max_restarts` and `max_seconds` fields set a circuit breaker: if a child crashes more than 5 times in 60 seconds, the supervisor itself shuts down. This prevents infinite restart loops.
+
+## Supervision Trees
+
+Supervisors can supervise other supervisors, forming a tree. The root supervisor starts top-level services, each of which may have its own supervisor managing its internal workers:
+
+```
+root_supervisor
+  |-- db_supervisor
+  |     |-- connection_pool
+  |     |-- migration_worker
+  |-- http_supervisor
+  |     |-- listener
+  |     |-- request_handler_pool
+  |-- job_supervisor
+        |-- scheduler
+        |-- worker_pool
+```
+
+Each subtree is isolated. A crash in the job scheduler does not affect the HTTP server or database pool. Failures are contained and recovery is local.
+
+## Crash and Restart in Action
+
+Consider a database worker. Instead of wrapping every database call in error handling, the worker focuses on its job. If the connection drops, it crashes, and the supervisor starts a fresh worker with a new connection:
+
+```japl
+fn database_worker(conn: DbConn) -> Never with Process[DbQuery] =
+  let query = Process.receive()
+  let result = Db.execute(conn, query)
+  Process.send(query.reply_to, result)
+  database_worker(conn)
+```
+
+If `Db.execute` fails due to a lost connection, the process crashes. The supervisor sees the crash and calls the `start` function in the child spec, which creates a new connection and a new worker. No error-handling code needed in the worker itself.
+
+## Inspecting the Tree
+
+JAPL provides built-in observability for supervision trees:
+
+```japl
+let tree = Supervisor.which_children(sup)
+-- Returns the tree of all supervised processes and their states
+```
+
+This lets you inspect the health of your system at runtime -- which processes are running, which have been restarted, and how many restarts have occurred.
+
+## Next Steps
+
+Now that you understand how JAPL programs are structured with processes and supervisors, learn how to compile and run them in [Building & Deploying](/docs/tour/10-building).

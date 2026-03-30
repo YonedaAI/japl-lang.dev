@@ -1,0 +1,28 @@
+---
+interface Props {
+  section?: string;
+  title: string;
+}
+
+const { section, title } = Astro.props;
+
+const sectionLabels: Record<string, string> = {
+  tour: 'Tour',
+  guide: 'Guide',
+  reference: 'Reference',
+  stdlib: 'Standard Library',
+};
+---
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <a href="/">Home</a>
+  <span class="separator">/</span>
+  <a href="/docs/tour/01-values">Docs</a>
+  {section && (
+    <>
+      <span class="separator">/</span>
+      <a href={`/docs/${section}`}>{sectionLabels[section] || section}</a>
+    </>
+  )}
+  <span class="separator">/</span>
+  <span>{title}</span>
+</nav>

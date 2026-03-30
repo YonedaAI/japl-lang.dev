@@ -1,0 +1,88 @@
+---
+---
+<nav class="nav">
+  <div class="nav-inner container">
+    <a href="/" class="nav-logo">
+      <span class="nav-logo-accent">J</span>APL
+    </a>
+    <div class="nav-links">
+      <a href="/docs/tour/01-values">Tour</a>
+      <a href="/docs/guide">Guide</a>
+      <a href="/docs/reference">Reference</a>
+      <a href="/examples">Examples</a>
+      <a href="/research">Research</a>
+      <a href="/blog">Blog</a>
+      <a href="https://github.com/YonedaAI/japl" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <button class="nav-mobile-toggle" aria-label="Toggle menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+  </div>
+</nav>
+
+<style>
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(10, 14, 23, 0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+  }
+
+  .nav-logo {
+    font-weight: 800;
+    font-size: 1.25rem;
+    color: var(--text);
+  }
+
+  .nav-logo-accent {
+    color: var(--accent);
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 32px;
+  }
+
+  .nav-links a {
+    color: var(--text-dim);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover {
+    color: var(--text);
+  }
+
+  .nav-mobile-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  @media (max-width: 640px) {
+    .nav-links { display: none; }
+    .nav-mobile-toggle { display: block; }
+  }
+</style>
+
+<script>
+  document.querySelector('.nav-mobile-toggle')?.addEventListener('click', () => {
+    document.querySelector('.docs-sidebar')?.classList.toggle('open');
+  });
+</script>

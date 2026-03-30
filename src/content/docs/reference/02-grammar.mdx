@@ -1,0 +1,385 @@
+---
+title: "Grammar"
+description: "Complete EBNF grammar reference for the JAPL programming language."
+status: "stable"
+order: 2
+section: "reference"
+prev: { title: "Language Specification", slug: "reference/01-spec" }
+next: { title: "CLI Reference", slug: "reference/03-cli" }
+---
+
+# Grammar
+
+This page presents the complete EBNF grammar for JAPL. The grammar uses the following conventions: `{ X }` means zero or more `X`; `[ X ]` means optional `X`; `( X | Y )` means alternative; literal tokens are in double quotes.
+
+---
+
+## Top-Level Program
+
+```text
+program         ::= { top_decl }
+
+top_decl        ::= module_decl
+                   | import_decl
+                   | type_decl
+                   | fn_decl
+                   | trait_decl
+                   | impl_decl
+                   | signature_decl
+                   | supervisor_decl
+                   | test_decl
+                   | property_decl
+                   | bench_decl
+                   | foreign_decl
+```
+
+---
+
+## Module Declarations
+
+```text
+module_decl     ::= "module" module_path [ ":" signature_ref ] "=" module_body
+                   | "module" module_path
+
+module_path     ::= TYPE_ID { "." TYPE_ID }
+
+module_body     ::= INDENT { module_item } DEDENT
+
+module_item     ::= type_decl | fn_decl | trait_decl | impl_decl
+                   | module_decl | signature_decl
+```
+
+---
+
+## Import Declarations
+
+```text
+import_decl     ::= "import" module_path [ import_spec ]
+
+import_spec     ::= "." "{" import_item { "," import_item } "}"
+
+import_item     ::= IDENT | TYPE_ID
+```
+
+---
+
+## Type Declarations
+
+```text
+type_decl       ::= "type" TYPE_ID [ type_params ] [ deriving_clause ] "=" type_body
+                   | "type" "alias" TYPE_ID [ type_params ] "=" type_expr
+                   | "opaque" "type" TYPE_ID [ type_params ]
+
+type_params     ::= "[" type_var { "," type_var } "]"
+
+type_var        ::= IDENT
+
+type_body       ::= sum_type | record_type
+
+sum_type        ::= "|" constructor { "|" constructor }
+
+constructor     ::= TYPE_ID [ "(" type_expr { "," type_expr } ")" ]
+
+record_type     ::= "{" field_decl { "," field_decl } "}"
+
+field_decl      ::= IDENT ":" type_expr
+
+deriving_clause ::= "deriving" "(" TYPE_ID { "," TYPE_ID } ")"
+```
+
+---
+
+## Function Declarations
+
+```text
+fn_decl         ::= "fn" IDENT [ type_params ] "(" [ param_list ] ")"
+                     "->" type_expr [ effect_clause ] [ where_clause ]
+                     "=" expr
+
+param_list      ::= param { "," param }
+
+param           ::= [ ownership_qual ] IDENT [ ":" type_expr ]
+
+ownership_qual  ::= "own" | "ref"
+
+effect_clause   ::= "with" effect { "," effect }
+
+effect          ::= "Pure" | "Io" | "Async" | "Net"
+                   | "State" "[" type_expr "]"
+                   | "Process" [ "[" type_expr "]" ]
+                   | "Fail" "[" type_expr "]"
+
+where_clause    ::= "where" constraint { "," constraint }
+
+constraint      ::= TYPE_ID "[" type_expr { "," type_expr } "]"
+```
+
+---
+
+## Expressions
+
+```text
+expr            ::= let_expr
+                   | use_expr
+                   | match_expr
+                   | if_expr
+                   | fn_expr
+                   | loop_expr
+                   | pipe_expr
+
+let_expr        ::= "let" pattern "=" expr NEWLINE expr
+
+use_expr        ::= "use" IDENT "=" expr NEWLINE expr
+
+match_expr      ::= "match" expr "with" NEWLINE { match_arm }
+
+match_arm       ::= "|" pattern [ guard ] "->" expr NEWLINE
+
+guard           ::= "if" expr
+
+if_expr         ::= "if" expr "then" expr "else" expr
+
+fn_expr         ::= "fn" [ IDENT ] [ "(" [ param_list ] ")" ] "->" expr
+                   | "fn" IDENT "->" expr
+
+loop_expr       ::= "loop" loop_bindings "while" expr "do" expr
+
+loop_bindings   ::= loop_binding { "," loop_binding }
+
+loop_binding    ::= IDENT "=" expr
+```
+
+### Operator Precedence (Expressions)
+
+```text
+pipe_expr       ::= unary_expr { "|>" unary_expr }
+
+unary_expr      ::= compose_expr { ">>" compose_expr }
+
+compose_expr    ::= or_expr
+
+or_expr         ::= and_expr { "||" and_expr }
+
+and_expr        ::= cmp_expr { "&&" cmp_expr }
+
+cmp_expr        ::= add_expr [ cmp_op add_expr ]
+
+cmp_op          ::= "==" | "!=" | "<" | ">" | "<=" | ">="
+
+add_expr        ::= mul_expr { ("+" | "-" | "++" | "<>") mul_expr }
+
+mul_expr        ::= postfix_expr { ("*" | "/" | "%") postfix_expr }
+
+postfix_expr    ::= primary_expr { "?" | "." IDENT | "(" [ arg_list ] ")" }
+
+arg_list        ::= expr { "," expr }
+```
+
+### Primary Expressions
+
+```text
+primary_expr    ::= IDENT
+                   | TYPE_ID [ "(" [ arg_list ] ")" ]
+                   | int_literal | float_literal | string_literal
+                   | "True" | "False"
+                   | "()"
+                   | "(" expr ")"
+                   | list_expr
+                   | record_expr
+                   | record_update
+
+list_expr       ::= "[" [ expr { "," expr } [ "," ".." expr ] ] "]"
+
+record_expr     ::= "{" field_assign { "," field_assign } "}"
+
+field_assign    ::= IDENT "=" expr
+
+record_update   ::= "{" expr "|" field_assign { "," field_assign } "}"
+```
+
+---
+
+## Patterns
+
+```text
+pattern         ::= constructor_pat
+                   | record_pat
+                   | literal_pat
+                   | wildcard_pat
+                   | var_pat
+                   | list_pat
+                   | pinned_pat
+
+constructor_pat ::= TYPE_ID [ "(" pattern { "," pattern } ")" ]
+
+record_pat      ::= "{" field_pat { "," field_pat } "}"
+
+field_pat       ::= IDENT [ "=" pattern ]
+
+literal_pat     ::= int_literal | float_literal | string_literal
+                   | "True" | "False" | "()"
+
+wildcard_pat    ::= "_"
+
+var_pat         ::= IDENT
+
+list_pat        ::= "[" [ pattern { "," pattern } [ "," ".." pattern ] ] "]"
+
+pinned_pat      ::= "^" IDENT
+```
+
+---
+
+## Type Expressions
+
+```text
+type_expr       ::= fn_type
+                   | simple_type
+
+fn_type         ::= "fn" "(" [ type_expr { "," type_expr } ] ")"
+                     "->" type_expr [ effect_clause ]
+
+simple_type     ::= named_type
+                   | record_type_expr
+                   | type_var
+                   | "(" type_expr ")"
+
+named_type      ::= TYPE_ID [ "[" type_expr { "," type_expr } "]" ]
+
+record_type_expr ::= "{" field_type { "," field_type } [ "|" type_var ] "}"
+
+field_type      ::= IDENT ":" type_expr
+```
+
+---
+
+## Trait Declarations
+
+```text
+trait_decl      ::= "trait" TYPE_ID "[" type_var { "," type_var } "]"
+                     [ "where" constraint { "," constraint } ]
+                     "=" INDENT { trait_member } DEDENT
+
+trait_member    ::= fn_signature
+
+fn_signature    ::= "fn" IDENT "(" [ param_list ] ")" "->" type_expr
+                     [ effect_clause ]
+```
+
+---
+
+## Impl Declarations
+
+```text
+impl_decl       ::= "impl" TYPE_ID "[" type_expr { "," type_expr } "]"
+                     "=" INDENT { fn_decl } DEDENT
+```
+
+---
+
+## Signature Declarations
+
+```text
+signature_decl  ::= "signature" TYPE_ID [ type_params ]
+                     "=" INDENT { sig_member } DEDENT
+
+sig_member      ::= "type" TYPE_ID
+                   | fn_signature
+```
+
+---
+
+## Supervisor Declarations
+
+```text
+supervisor_decl ::= "supervisor" IDENT "=" INDENT supervisor_body DEDENT
+
+supervisor_body ::= "strategy" "=" strategy_expr NEWLINE
+                     "max_restarts" "=" int_literal NEWLINE
+                     "max_seconds" "=" int_literal NEWLINE
+                     "children" "=" "[" { child_spec "," } "]"
+
+strategy_expr   ::= "OneForOne" | "AllForOne" | "RestForOne"
+
+child_spec      ::= "{" "id" "=" string_literal ","
+                         "start" "=" expr ","
+                         "restart" "=" restart_type ","
+                         "shutdown" "=" shutdown_expr "}"
+
+restart_type    ::= "Permanent" | "Transient" | "Temporary"
+
+shutdown_expr   ::= "Timeout" "(" int_literal ")" | "Brutal"
+```
+
+---
+
+## Test, Property, and Bench Declarations
+
+```text
+test_decl       ::= "test" string_literal "=" expr
+
+property_decl   ::= "property" string_literal "="
+                     "forall" "(" param_list ")" "->" expr
+
+bench_decl      ::= "bench" string_literal "=" expr
+```
+
+---
+
+## Foreign Declarations
+
+```text
+foreign_decl    ::= "foreign" string_literal "fn" IDENT
+                     "(" [ param_list ] ")" "->" type_expr
+                   | "foreign" string_literal "module" string_literal
+                     "=" INDENT { foreign_fn } DEDENT
+
+foreign_fn      ::= "fn" IDENT "(" [ param_list ] ")" "->" type_expr
+```
+
+---
+
+## Lexical Grammar
+
+### Identifiers
+
+```text
+identifier      ::= lower_start (alpha | digit | '_')*
+type_identifier ::= upper_start (alpha | digit | '_')*
+lower_start     ::= 'a' .. 'z' | '_'
+upper_start     ::= 'A' .. 'Z'
+```
+
+### Integer Literals
+
+```text
+int_literal     ::= decimal | hexadecimal | octal | binary
+decimal         ::= digit (digit | '_')*
+hexadecimal     ::= '0x' hex_digit (hex_digit | '_')*
+octal           ::= '0o' oct_digit (oct_digit | '_')*
+binary          ::= '0b' bin_digit (bin_digit | '_')*
+```
+
+### Float Literals
+
+```text
+float_literal   ::= digit+ '.' digit+ exponent?
+exponent        ::= ('e' | 'E') ('+' | '-')? digit+
+```
+
+### String Literals
+
+```text
+string_literal  ::= '"' string_char* '"'
+string_char     ::= <any UTF-8 char except '"' and '\'>
+                   | escape_sequence
+escape_sequence ::= '\\' | '\"' | '\n' | '\t' | '\r' | '\0'
+                   | '\u{' hex_digit+ '}'
+```
+
+### Comments
+
+```text
+line_comment    ::= '--' <any char>* NEWLINE
+doc_comment     ::= '---' <any char>* NEWLINE
+```

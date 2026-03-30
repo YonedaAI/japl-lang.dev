@@ -3,7 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 ---
-<BaseLayout title="The JAPL Programming Language" description="A strict typed functional programming language with Rust ownership, Erlang processes, and Go simplicity.">
+<BaseLayout title="The JAPL Programming Language" description="A typed actor language for building reliable distributed systems and AI agents. Compiles to WASM, runs on a Rust runtime.">
   <Nav />
 
   <!-- Hero -->
@@ -14,10 +14,12 @@ import Footer from '../components/Footer.astro';
           <span class="hero-accent">J</span>APL
         </h1>
         <p class="hero-subtitle">
-          Strict typed functional programming.<br/>
-          <span class="hero-highlight">Rust</span> ownership.
-          <span class="hero-highlight">Erlang</span> processes.
-          <span class="hero-highlight">Go</span> simplicity.
+          A typed actor language for reliable<br/>distributed systems and AI agents.
+        </p>
+        <p class="hero-subtitle">
+          Compiles to <span class="hero-highlight">WASM</span>.
+          <span class="hero-highlight">Rust</span> runtime.
+          Real <span class="hero-highlight">processes</span>, supervision, and LLM effects.
         </p>
         <div class="hero-cta">
           <a href="/docs/tour/01-values" class="btn btn-primary">Start the Tour</a>
@@ -60,32 +62,32 @@ import Footer from '../components/Footer.astro';
       <h2 class="section-title">Core Principles</h2>
       <div class="principles-grid">
         <div class="principle-card">
-          <h3>Strict Types</h3>
-          <p>Full Hindley-Milner inference with algebraic data types. No nulls, no exceptions — only typed values.</p>
+          <h3>Typed Actors</h3>
+          <p>Erlang-style lightweight processes with typed message passing. Each process is an isolated WASM instance with its own mailbox.</p>
+        </div>
+        <div class="principle-card">
+          <h3>WASM Target</h3>
+          <p>Compiles to WebAssembly, runs on a Rust runtime with wasmtime. No garbage collector — ownership and linear types manage memory.</p>
+        </div>
+        <div class="principle-card">
+          <h3>LLM Effects</h3>
+          <p>LLM calls are tracked effects, not hidden side effects. The type system knows which functions touch AI. Budgets are linear resources.</p>
         </div>
         <div class="principle-card">
           <h3>Ownership</h3>
           <p>Rust-style affine types without a borrow checker. Move semantics prevent data races at compile time.</p>
         </div>
         <div class="principle-card">
-          <h3>Processes</h3>
-          <p>Erlang-style lightweight processes with typed message passing. Supervision trees built into the language.</p>
+          <h3>Supervision</h3>
+          <p>OneForOne, AllForOne, RestForOne restart strategies. Agents are supervised processes with typed failure recovery.</p>
         </div>
         <div class="principle-card">
-          <h3>Expression-Oriented</h3>
-          <p>Everything is an expression. Pattern matching, if/else, and blocks all return values.</p>
-        </div>
-        <div class="principle-card">
-          <h3>Immutable First</h3>
-          <p>Values are immutable by default. Mutation is explicit, scoped, and tracked by the type system.</p>
-        </div>
-        <div class="principle-card">
-          <h3>Pipe-Forward</h3>
-          <p>Data flows left-to-right with |&gt; pipes. Function composition with &gt;&gt;. No nested parentheses.</p>
+          <h3>Distribution</h3>
+          <p>Location-transparent PIDs. Same syntax for local and remote processes. Built-in node clustering with typed serialization.</p>
         </div>
         <div class="principle-card">
           <h3>Simple Syntax</h3>
-          <p>Go-level readability with ML-level power. Minimal keywords, consistent structure, no ceremony.</p>
+          <p>Go-level readability with ML-level power. Pipe-forward, pattern matching, expression-oriented. No ceremony.</p>
         </div>
       </div>
     </div>
@@ -100,22 +102,22 @@ import Footer from '../components/Footer.astro';
         <div class="dna-card" style="--dna-color: var(--ml);">
           <div class="dna-label">ML / Haskell</div>
           <h3>Type System</h3>
-          <p>Hindley-Milner inference, algebraic data types, pattern matching, type classes as traits.</p>
+          <p>Hindley-Milner inference, algebraic data types, pattern matching, effect tracking.</p>
         </div>
         <div class="dna-card" style="--dna-color: var(--rust);">
           <div class="dna-label">Rust</div>
           <h3>Ownership</h3>
-          <p>Affine types, move semantics, zero-cost abstractions, WASM compilation target.</p>
+          <p>Affine types, move semantics, WASM compilation, Rust runtime.</p>
         </div>
         <div class="dna-card" style="--dna-color: var(--erlang);">
           <div class="dna-label">Erlang / Elixir</div>
           <h3>Concurrency</h3>
-          <p>Lightweight processes, message passing, supervision trees, fault tolerance.</p>
+          <p>Typed actors, message passing, supervision trees, fault tolerance.</p>
         </div>
         <div class="dna-card" style="--dna-color: var(--go);">
           <div class="dna-label">Go</div>
           <h3>Simplicity</h3>
-          <p>Fast compilation, minimal syntax, easy tooling, single-binary deployment.</p>
+          <p>Minimal syntax, fast compilation, single-binary deployment.</p>
         </div>
       </div>
     </div>
@@ -125,7 +127,7 @@ import Footer from '../components/Footer.astro';
   <section class="compiler">
     <div class="container">
       <h2 class="section-title">Compiler Architecture</h2>
-      <p class="section-desc">A multi-stage pipeline from source to WASM, with type checking at every stage.</p>
+      <p class="section-desc">TypeScript frontend, WASM backend, Rust runtime. 248 tests passing.</p>
       <div class="compiler-stages">
         <div class="stage-card">
           <div class="stage-num">1</div>

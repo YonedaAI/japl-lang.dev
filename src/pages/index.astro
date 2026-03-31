@@ -127,7 +127,7 @@ import Footer from '../components/Footer.astro';
   <section class="compiler">
     <div class="container">
       <h2 class="section-title">Compiler Architecture</h2>
-      <p class="section-desc">TypeScript frontend compiles JAPL source to WebAssembly, executed on a Rust runtime.</p>
+      <p class="section-desc">Rust compiler emits WASM bytecode, executed on a Rust runtime with wasmtime.</p>
       <div class="compiler-stages">
         <div class="stage-card">
           <div class="stage-num">1</div>
@@ -138,19 +138,19 @@ import Footer from '../components/Footer.astro';
         <div class="stage-card">
           <div class="stage-num">2</div>
           <h3>Parser</h3>
-          <p>Builds a concrete syntax tree with full span tracking</p>
+          <p>Builds an abstract syntax tree with full span tracking</p>
         </div>
         <div class="stage-arrow">&#8594;</div>
         <div class="stage-card">
           <div class="stage-num">3</div>
           <h3>Type Checker</h3>
-          <p>Hindley-Milner inference with ownership analysis</p>
+          <p>Hindley-Milner inference with effect and ownership analysis</p>
         </div>
         <div class="stage-arrow">&#8594;</div>
         <div class="stage-card">
           <div class="stage-num">4</div>
           <h3>Codegen</h3>
-          <p>Emits WebAssembly text format (WAT)</p>
+          <p>Emits WASM bytecode for the Rust runtime</p>
         </div>
       </div>
     </div>

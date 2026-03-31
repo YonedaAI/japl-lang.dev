@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#7c5cfc" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#0a0e17" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0a0e17"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Border -->
+  <rect x="1" y="1" width="1198" height="628" rx="0" fill="none" stroke="#1e2433" stroke-width="2"/>
+
+  <!-- Logo mark -->
+  <text x="600" y="210" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="800" font-size="120" fill="#e6edf3"><tspan fill="#7c5cfc">J</tspan>APL</text>
+
+  <!-- Tagline -->
+  <text x="600" y="290" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="500" font-size="32" fill="#8b949e">A typed actor language for reliable</text>
+  <text x="600" y="332" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="500" font-size="32" fill="#8b949e">distributed systems and AI agents.</text>
+
+  <!-- Code snippet -->
+  <rect x="300" y="375" width="600" height="160" rx="12" fill="#161b22" stroke="#1e2433" stroke-width="1.5"/>
+
+  <!-- Code line 1: fn main -->
+  <text x="332" y="412" font-family="JetBrains Mono, monospace" font-size="18" fill="#ff7b72">fn</text>
+  <text x="360" y="412" font-family="JetBrains Mono, monospace" font-size="18" fill="#d2a8ff">main</text>
+  <text x="410" y="412" font-family="JetBrains Mono, monospace" font-size="18" fill="#e6edf3">() =</text>
+
+  <!-- Code line 2: let agent -->
+  <text x="348" y="442" font-family="JetBrains Mono, monospace" font-size="18" fill="#ff7b72">let</text>
+  <text x="386" y="442" font-family="JetBrains Mono, monospace" font-size="18" fill="#e6edf3">agent =</text>
+  <text x="472" y="442" font-family="JetBrains Mono, monospace" font-size="18" fill="#c9d1d9">spawn</text>
+  <text x="530" y="442" font-family="JetBrains Mono, monospace" font-size="18" fill="#e6edf3">(</text>
+  <text x="541" y="442" font-family="JetBrains Mono, monospace" font-size="18" fill="#c9d1d9">handler</text>
+  <text x="618" y="442" font-family="JetBrains Mono, monospace" font-size="18" fill="#e6edf3">)</text>
+
+  <!-- Code line 3: send -->
+  <text x="348" y="472" font-family="JetBrains Mono, monospace" font-size="18" fill="#c9d1d9">send</text>
+  <text x="393" y="472" font-family="JetBrains Mono, monospace" font-size="18" fill="#e6edf3">(agent,</text>
+  <text x="472" y="472" font-family="JetBrains Mono, monospace" font-size="18" fill="#79c0ff">Query</text>
+  <text x="521" y="472" font-family="JetBrains Mono, monospace" font-size="18" fill="#e6edf3">(</text>
+  <text x="532" y="472" font-family="JetBrains Mono, monospace" font-size="18" fill="#a5d6ff">"plan"</text>
+  <text x="598" y="472" font-family="JetBrains Mono, monospace" font-size="18" fill="#e6edf3">))</text>
+
+  <!-- Code line 4: supervise -->
+  <text x="348" y="502" font-family="JetBrains Mono, monospace" font-size="18" fill="#c9d1d9">supervise</text>
+  <text x="447" y="502" font-family="JetBrains Mono, monospace" font-size="18" fill="#e6edf3">([agent],</text>
+  <text x="543" y="502" font-family="JetBrains Mono, monospace" font-size="18" fill="#79c0ff">OneForOne</text>
+  <text x="642" y="502" font-family="JetBrains Mono, monospace" font-size="18" fill="#e6edf3">)</text>
+
+  <!-- Bottom bar -->
+  <text x="600" y="590" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="20" fill="#484f58">japl-lang.dev</text>
+</svg>
